@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="380" viewBox="0 0 600 380" role="img" aria-labelledby="title desc">
+    <title id="title">A66 增殖</title><desc id="desc">世界熵卡牌 增殖 的原创抽象矢量卡图</desc>
+    <defs><radialGradient id="bg" cx="50%" cy="42%" r="75%"><stop offset="0" stop-color="#5f7752"/><stop offset="1" stop-color="#090d11"/></radialGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    <rect width="600" height="380" rx="18" fill="url(#bg)"/>
+    <path d="M24 45V24h21M555 24h21v21M24 335v21h21M555 356h21v-21" fill="none" stroke="#c0d594" stroke-opacity=".35"/>
+    <g filter="url(#glow)"><g fill="#c0d594" fill-opacity=".13" stroke="#c0d594" stroke-width="3"><circle cx="300" cy="190" r="70"/><circle cx="205" cy="135" r="42"/><circle cx="394" cy="132" r="48"/><circle cx="208" cy="250" r="50"/><circle cx="394" cy="250" r="39"/><circle cx="300" cy="85" r="27"/><circle cx="300" cy="302" r="31"/></g><g fill="#c0d594"><circle cx="280" cy="178" r="10"/><circle cx="327" cy="208" r="8"/><circle cx="204" cy="135" r="7"/><circle cx="394" cy="132" r="8"/></g></g>
+    </svg>

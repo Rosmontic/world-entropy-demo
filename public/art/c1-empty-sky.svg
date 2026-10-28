@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="380" viewBox="0 0 600 380" role="img" aria-labelledby="title desc">
+    <title id="title">C1 空天</title><desc id="desc">世界熵卡牌 空天 的原创抽象矢量卡图</desc>
+    <defs><radialGradient id="bg" cx="50%" cy="42%" r="75%"><stop offset="0" stop-color="#566773"/><stop offset="1" stop-color="#090d11"/></radialGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    <rect width="600" height="380" rx="18" fill="url(#bg)"/>
+    <path d="M24 45V24h21M555 24h21v21M24 335v21h21M555 356h21v-21" fill="none" stroke="#d8e0df" stroke-opacity=".35"/>
+    <g filter="url(#glow)"><path d="M70 258q230-210 460 0" fill="none" stroke="#d8e0df" stroke-width="5"/>
+        <path d="M98 259q202-158 404 0" fill="#d8e0df" fill-opacity=".06" stroke="#d8e0df" stroke-width="2"/>
+        <circle cx="300" cy="168" r="41" fill="none" stroke="#d8e0df" stroke-width="2"/><path d="M300 127v82M259 168h82" stroke="#d8e0df" opacity=".5"/>
+        <path d="M65 285h470" stroke="#d8e0df" stroke-width="3"/></g>
+    </svg>

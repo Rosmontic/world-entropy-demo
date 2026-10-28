@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="380" viewBox="0 0 600 380" role="img" aria-labelledby="title desc">
+    <title id="title">O3 静默公约</title><desc id="desc">世界熵卡牌 静默公约 的原创抽象矢量卡图</desc>
+    <defs><radialGradient id="bg" cx="50%" cy="42%" r="75%"><stop offset="0" stop-color="#6e685c"/><stop offset="1" stop-color="#090d11"/></radialGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    <rect width="600" height="380" rx="18" fill="url(#bg)"/>
+    <path d="M24 45V24h21M555 24h21v21M24 335v21h21M555 356h21v-21" fill="none" stroke="#ded4b7" stroke-opacity=".35"/>
+    <g filter="url(#glow)"><circle cx="300" cy="190" r="117" fill="none" stroke="#ded4b7" stroke-width="3"/>
+    <circle cx="300" cy="190" r="86" fill="none" stroke="#ded4b7" stroke-width="2" stroke-dasharray="4 10"/>
+    <path d="M210 190h180M300 100v180" stroke="#ded4b7" stroke-width="2" opacity=".45"/>
+    <path d="M248 190l34 34 73-76" fill="none" stroke="#ded4b7" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></g>
+    </svg>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="380" viewBox="0 0 600 380" role="img" aria-labelledby="title desc">
+    <title id="title">Y96 千面</title><desc id="desc">世界熵卡牌 千面 的原创抽象矢量卡图</desc>
+    <defs><radialGradient id="bg" cx="50%" cy="42%" r="75%"><stop offset="0" stop-color="#754d66"/><stop offset="1" stop-color="#090d11"/></radialGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    <rect width="600" height="380" rx="18" fill="url(#bg)"/>
+    <path d="M24 45V24h21M555 24h21v21M24 335v21h21M555 356h21v-21" fill="none" stroke="#d49ab5" stroke-opacity=".35"/>
+    <g filter="url(#glow)"><g fill="none" stroke="#d49ab5" stroke-width="3"><path d="M213 101q-62 50-43 135 15 69 79 77 54-45 46-122-5-65-82-90z"/>
+        <path d="M387 101q62 50 43 135-15 69-79 77-54-45-46-122 5-65 82-90z"/>
+        <path d="M184 182l28-13 25 15M416 182l-28-13-25 15M213 252q31 22 57-5M387 252q-31 22-57-5"/></g>
+        <path d="M300 77v245" stroke="#d49ab5" stroke-width="2" stroke-dasharray="8 12"/></g>
+    </svg>

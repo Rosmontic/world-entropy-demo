@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="380" viewBox="0 0 600 380" role="img" aria-labelledby="title desc">
+    <title id="title">B9 蜂巢</title><desc id="desc">世界熵卡牌 蜂巢 的原创抽象矢量卡图</desc>
+    <defs><radialGradient id="bg" cx="50%" cy="42%" r="75%"><stop offset="0" stop-color="#476d68"/><stop offset="1" stop-color="#090d11"/></radialGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    <rect width="600" height="380" rx="18" fill="url(#bg)"/>
+    <path d="M24 45V24h21M555 24h21v21M24 335v21h21M555 356h21v-21" fill="none" stroke="#c8c785" stroke-opacity=".35"/>
+    <g filter="url(#glow)"><g fill="none" stroke="#c8c785" stroke-width="3"><path d="M300 150l30 17v34l-30 17-30-17v-34z"/><path d="M242 116l30 17v34l-30 17-30-17v-34z"/><path d="M358 116l30 17v34l-30 17-30-17v-34z"/><path d="M242 184l30 17v34l-30 17-30-17v-34z"/><path d="M358 184l30 17v34l-30 17-30-17v-34z"/><path d="M184 150l30 17v34l-30 17-30-17v-34z"/><path d="M416 150l30 17v34l-30 17-30-17v-34z"/><circle cx="300" cy="185" r="12" fill="#c8c785"/></g></g>
+    </svg>

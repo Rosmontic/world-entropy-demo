@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="380" viewBox="0 0 600 380" role="img" aria-labelledby="title desc">
+    <title id="title">A23 饥馑</title><desc id="desc">世界熵卡牌 饥馑 的原创抽象矢量卡图</desc>
+    <defs><radialGradient id="bg" cx="50%" cy="42%" r="75%"><stop offset="0" stop-color="#8f503d"/><stop offset="1" stop-color="#090d11"/></radialGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    <rect width="600" height="380" rx="18" fill="url(#bg)"/>
+    <path d="M24 45V24h21M555 24h21v21M24 335v21h21M555 356h21v-21" fill="none" stroke="#e0a767" stroke-opacity=".35"/>
+    <g filter="url(#glow)"><circle cx="300" cy="170" r="77" fill="none" stroke="#e0a767" stroke-width="4"/>
+        <path d="M300 93v154M223 170h154M246 116l108 108M354 116 246 224" stroke="#e0a767" stroke-width="2" opacity=".45"/>
+        <path d="M75 298l91-53 55 26 74-38 65 41 69-28 96 52M173 249l-19 74M302 237l-17 88M425 249l26 74" fill="none" stroke="#e0a767" stroke-width="4"/></g>
+    </svg>

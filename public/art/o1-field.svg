@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="380" viewBox="0 0 600 380" role="img" aria-labelledby="title desc">
+    <title id="title">O1 无名原野</title><desc id="desc">世界熵卡牌 无名原野 的原创抽象矢量卡图</desc>
+    <defs><radialGradient id="bg" cx="50%" cy="42%" r="75%"><stop offset="0" stop-color="#667052"/><stop offset="1" stop-color="#090d11"/></radialGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    <rect width="600" height="380" rx="18" fill="url(#bg)"/>
+    <path d="M24 45V24h21M555 24h21v21M24 335v21h21M555 356h21v-21" fill="none" stroke="#c6ca9c" stroke-opacity=".35"/>
+    <g filter="url(#glow)"><path d="M40 277q110-90 235-28 136-95 285 20" fill="#c6ca9c" fill-opacity=".12" stroke="#c6ca9c" stroke-width="3"/>
+        <path d="M45 303q140-64 255-19 132-55 255-9M66 332q130-42 247-15 115-34 221-11" fill="none" stroke="#c6ca9c" stroke-width="3" opacity=".7"/>
+        <path d="M300 240V92m0 52-36-28m36 68 45-35m-45 4-29-22" stroke="#c6ca9c" stroke-width="4"/></g>
+    </svg>

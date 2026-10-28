@@ -1,0 +1,29 @@
+:root {
+  --bg: #080d0f;
+  --panel: #0e1517;
+  --ink: #dce2d7;
+  --muted: #89958e;
+  --faint: #53615b;
+  --line: #2b3736;
+  --accent: #c7d8a7;
+  --accent-dim: #77876a;
+  --serif: 'Noto Serif SC', 'Songti SC', 'STSong', Georgia, serif;
+  --sans: Inter, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-family: var(--sans);
+  color: var(--ink);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body { margin: 0; min-width: 340px; min-height: 100vh; }
+button, input { font: inherit; }
+button:focus-visible, a:focus-visible, [role='button']:focus-visible, input:focus-visible { outline: 1px solid var(--accent); outline-offset: 3px; }
+::selection { background: rgba(199,216,167,.25); color: #fff; }
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2d3b38; }

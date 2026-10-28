@@ -23,7 +23,7 @@ npm install
 npm run dev
 ```
 
-生产构建：
+开发服务器默认使用 Vite 地址。生产构建：
 
 ```bash
 npm run build
@@ -33,31 +33,54 @@ npm run preview
 ## 测试
 
 ```bash
-npm test
-npm run lint
-npm run build
+npm test          # 规则引擎单元测试
+npm run lint      # 静态代码检查
+npm run build     # 生产构建
 ```
 
-`scripts/validate.mjs` 使用本机 Edge 完成一次真实浏览器试玩，并在结束后关闭临时服务器。可按本机浏览器路径调整 `executablePath`。
+`scripts/validate.mjs` 还会启动临时开发服务器，使用本机 Edge 完成一次真实浏览器试玩，并在结束后关闭服务器。可按本机浏览器路径调整脚本中的 `executablePath`。
 
-## 独立内容仓库
+## 仓库结构
+
+```text
+world-entropy-demo/       主程序（本仓库）
+world-entropy-cards/      独立卡牌数据库
+world-entropy-assets/     独立图片资源库
+```
 
 - [卡牌数据库](https://github.com/Rosmontic/world-entropy-cards)
 - [图片资源库](https://github.com/Rosmontic/world-entropy-assets)
 
-主程序内置两份资源的同步副本，保证离线构建与 GitHub Pages 部署不依赖跨仓库请求：卡牌副本位于 `src/data/cards.json`，卡图副本位于 `public/art/`。三个仓库位于同一父目录时，可运行 `python scripts/sync_content.py` 同步。
+主程序内置两份资源的同步副本，以保证离线构建与 GitHub Pages 部署不依赖跨仓库请求：
+
+- 卡牌副本：`src/data/cards.json`
+- 卡图副本：`public/art/`
+
+当三个仓库位于同一父目录时，可运行：
+
+```bash
+python scripts/sync_content.py
+```
 
 ## 程序结构
 
-- `src/game/engine.js`：出牌、显现、效果、计分与 AI。
-- `src/game/engine.test.js`：规则测试。
-- `src/components/CardView.jsx`：卡牌组件。
-- `src/App.jsx`：对局界面与弹窗。
-- `scripts/validate.mjs`：浏览器端完整回合验证。
+```text
+src/
+  components/CardView.jsx  卡牌与卡背组件
+  data/cards.json         卡牌数据同步副本
+  game/engine.js          出牌、显现、效果、计分与 AI
+  game/engine.test.js     规则测试
+  App.jsx                 对局界面与弹窗
+  App.css                 视觉与响应式布局
+public/art/               原创 SVG 卡图同步副本
+scripts/
+  sync_content.py         内容同步
+  validate.mjs            浏览器端完整回合验证
+```
 
 ## GitHub Pages
 
-在 **Settings → Pages** 中将 Source 设为 **GitHub Actions**。之后推送 `main` 即会通过 `.github/workflows/deploy.yml` 自动部署。Vite 使用相对资源路径，支持项目页子目录。
+仓库提供部署模板 `deploy.yml.example`，但尚未启用在线 Pages。需要发布时，将模板复制为 `.github/workflows/deploy.yml` 并提交，再在 GitHub 仓库的 **Settings → Pages** 中将 Source 设为 **GitHub Actions**；之后推送 `main` 即会自动部署。Vite 使用相对资源路径，支持项目页子目录。
 
 ## DEMO 边界
 

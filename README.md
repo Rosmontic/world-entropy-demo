@@ -78,9 +78,11 @@ scripts/
   validate.mjs            浏览器端完整回合验证
 ```
 
-## GitHub Pages
+## 在线试玩
 
-仓库提供部署模板 `deploy.yml.example`，但尚未启用在线 Pages。需要发布时，将模板复制为 `.github/workflows/deploy.yml` 并提交，再在 GitHub 仓库的 **Settings → Pages** 中将 Source 设为 **GitHub Actions**；之后推送 `main` 即会自动部署。Vite 使用相对资源路径，支持项目页子目录。
+**[打开《世界熵》网页 DEMO](https://rosmontic.github.io/world-entropy-demo/)**
+
+网页由 GitHub Actions 自动测试、构建并发布到 GitHub Pages。工作流位于 `.github/workflows/deploy.yml`，推送 `main` 即会触发部署；同时保留 `deploy.yml.example` 作为配置参考。Vite 使用相对资源路径，支持项目页子目录。
 
 ## DEMO 边界
 

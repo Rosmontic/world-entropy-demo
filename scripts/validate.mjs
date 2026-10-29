@@ -65,7 +65,7 @@ try {
 
   await page.getByRole('button', { name: /卡牌库/ }).click()
   const libraryCards = await page.locator('.library-grid .game-card').count()
-  if (libraryCards !== 12) throw new Error(`卡牌库应为 12 张，实际 ${libraryCards}`)
+  if (libraryCards !== 13) throw new Error(`卡牌库应为 13 张，实际 ${libraryCards}`)
   await page.getByRole('textbox', { name: '搜索卡牌' }).fill('镜子')
   if (await page.locator('.library-grid .game-card').count() !== 1) throw new Error('卡牌搜索未正确过滤')
   await page.getByRole('button', { name: '关闭' }).click()
@@ -86,6 +86,15 @@ try {
   await page.getByRole('button', { name: '完成校订，进入下一回合' }).click()
   await page.getByText('第 2 回合', { exact: true }).waitFor()
 
+  await page.getByRole('button', { name: '重新开始' }).click()
+  await page.getByRole('button', { name: '停止出牌' }).click()
+  await page.locator('.main-slot .card-id').filter({ hasText: 'O1000' }).waitFor()
+  await page.screenshot({ path: path.join(artifacts, 'system-main.png'), fullPage: true })
+  await page.getByRole('button', { name: '进入弃牌与保留' }).waitFor({ timeout: 30000 })
+  await page.getByRole('button', { name: '进入弃牌与保留' }).click()
+  await page.getByRole('button', { name: '完成校订，进入下一回合' }).click()
+  await page.getByText('第 2 回合', { exact: true }).waitFor()
+
   const brokenImages = await page.locator('img').evaluateAll((images) => images.filter((image) => !image.complete || image.naturalWidth === 0).map((image) => image.src))
   if (brokenImages.length) throw new Error(`图片加载失败：${brokenImages.join(', ')}`)
 
@@ -97,8 +106,8 @@ try {
 
   const report = {
     ok: true,
-    checks: ['标题页', '12 张卡牌库', '卡牌搜索', '规则弹窗', '5 张开局手牌', '6 个战场位置', '点击出牌', 'AI 自动出牌', '逐张显现', '回合结算', '保留并进入下一回合', '图片加载', '手机布局'],
-    screenshots: ['artifacts/title.png', 'artifacts/gameplay.png', 'artifacts/mobile.png'],
+    checks: ['标题页', '13 张卡牌库', '卡牌搜索', '规则弹窗', '5 张开局手牌', '6 个战场位置', '点击出牌', '系统备用主世界', 'AI 自动出牌', '逐张显现', '回合结算', '保留并进入下一回合', '图片加载', '手机布局'],
+    screenshots: ['artifacts/title.png', 'artifacts/gameplay.png', 'artifacts/system-main.png', 'artifacts/mobile.png'],
     consoleErrors: errors,
   }
   await writeFile(path.join(artifacts, 'validation.json'), JSON.stringify(report, null, 2))

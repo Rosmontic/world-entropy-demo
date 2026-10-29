@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   ANCHOR, CARD_MAP, calculateScores, canPlay, completeRound, createGame, openRetention,
-  revealStep,
+  placeCard, revealStep, stopTurn,
 } from './engine'
 
 function card(id, overrides = {}) {
@@ -127,5 +127,55 @@ describe('连续回合', () => {
     expect(game.round).toBe(4)
     expect(game.hands.user.length).toBeLessThanOrEqual(5)
     expect(game.hands.ai.length).toBeLessThanOrEqual(5)
+  })
+})
+
+describe('系统备用主世界', () => {
+  it('先手无法出牌时生成存在，双方空里世界时先手获得 6 分', () => {
+    let game = createGame()
+    game.dimensions = ['chaos', 'barren']
+    game.hands.user = []
+    game = stopTurn(game)
+    expect(game.board[0].cardId).toBe('O1000')
+    expect(game.board[0].owner).toBe('system')
+    expect(game.board[0].generated).toBe(true)
+    expect(game.board[0].faceUp).toBe(true)
+    expect(game.hands.user).toHaveLength(0)
+    game = stopTurn(game)
+    game = revealStep(game)
+    expect(game.phase).toBe('roundEnd')
+    expect(game.roundResult.firstScore).toBe(6)
+    expect(game.roundResult.secondScore).toBe(0)
+    expect(game.wins.user).toBe(1)
+    expect(game.wins.ai).toBe(0)
+  })
+
+  it('先手已有主世界时不生成存在', () => {
+    let game = createGame()
+    const playable = game.hands.user.find((item) => canPlay(item, 1, game.round))
+    game = placeCard(game, playable.uid)
+    const mainUid = game.board[0].uid
+    game = stopTurn(game)
+    expect(game.board[0].uid).toBe(mainUid)
+    expect(game.board[0].cardId).not.toBe('O1000')
+    expect(game.board.filter((item) => item?.cardId === 'O1000')).toHaveLength(0)
+  })
+
+  it('存在进入系统放逐区并在下次生成时恢复原始值', () => {
+    let game = createGame()
+    game = stopTurn(game)
+    const firstUid = game.board[0].uid
+    game.board[0].stats.chaos = 6
+    game.phase = 'retain'
+    game = completeRound(game, null)
+    expect(game.exiles.system).toHaveLength(1)
+    expect(game.exiles.system[0].uid).toBe(firstUid)
+    for (const player of ['user', 'ai']) {
+      const cards = [...game.hands[player], ...game.decks[player], ...game.discards[player], ...game.exiles[player]]
+      expect(cards.filter((item) => item.cardId === 'O1000')).toHaveLength(0)
+    }
+    game = stopTurn(game)
+    expect(game.board[0].uid).not.toBe(firstUid)
+    expect(game.board[0].stats).toEqual({ chaos: 1, barren: 1, disqualification: 1, calamity: 1 })
   })
 })

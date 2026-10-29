@@ -110,7 +110,7 @@ export function createGame() {
     hands: { user: [], ai: [] },
     decks: { user: buildDeck('user'), ai: buildDeck('ai') },
     discards: { user: [], ai: [] },
-    exiles: { user: [], ai: [] },
+    exiles: { user: [], ai: [], system: [] },
     logs: [],
     revealQueue: [],
     revealIndex: 0,
@@ -304,11 +304,21 @@ export function placeCard(source, uid) {
   return state
 }
 
+function ensureMainWorld(state) {
+  if (state.board[0]) return
+  const card = makeInstance('O1000', 'system', true)
+  card.faceUp = true
+  state.board[0] = card
+  addLog(state, '系统将「存在」置入空缺的1号位。', 'important')
+  revealInstance(state, 1)
+}
+
 export function stopTurn(source) {
   if (source.phase !== 'play') return source
   const state = clone(source)
   addLog(state, `${state.turn.player === 'user' ? '你' : '对手'}停止出牌。`)
   if (state.turn.player === state.firstPlayer) {
+    ensureMainWorld(state)
     state.turn.player = OTHER_PLAYER[state.firstPlayer]
     state.turn.index = 0
   } else {

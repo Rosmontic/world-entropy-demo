@@ -248,7 +248,7 @@ function App() {
         <Modal title="校订规则速查" eyebrow="HOW TO PLAY" wide onClose={() => setModal(null)}>
           <div className="rules-layout">
             <section><span className="rule-number">01</span><h3>目标</h3><p>与对手争夺同一世界的解释权。每回合高分者获得 1 胜点，同分各得 1 点；先到 5 胜。</p></section>
-            <section><span className="rule-number">02</span><h3>放置</h3><p>先手使用 1、3、5 号位，后手使用 2、4、6 号位。1 号主世界默认明牌，其余里世界默认暗牌。</p></section>
+            <section><span className="rule-number">02</span><h3>放置</h3><p>先手使用 1、3、5 号位，后手使用 2、4、6 号位。1 号主世界默认明牌，其余里世界默认暗牌。若先手停止时主世界为空，系统将明牌置入「存在」。</p></section>
             <section><span className="rule-number">03</span><h3>显现</h3><p>双方停止出牌后，按 1→6 逐张翻开并结算效果。主世界是双方公共乘数，里世界分别提供加数。</p></section>
             <section><span className="rule-number">04</span><h3>保留</h3><p>回合结束至多保留 1 张手牌。每回合开始补至 5 张；先手交替，高等级卡牌随回合开放。</p></section>
           </div>

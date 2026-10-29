@@ -162,6 +162,19 @@
       "text": "［主导］此牌属性无法增加。",
       "flavor": "所有人同意不再追问，于是世界暂时同意继续存在。",
       "art": "o3-pact.svg"
+    },
+    {
+      "id": "O1000",
+      "name": "存在",
+      "series": "O",
+      "level": "纯净",
+      "stats": { "chaos": 1, "barren": 1, "disqualification": 1, "calamity": 1 },
+      "keywords": ["中枢", "放逐"],
+      "trigger": null,
+      "effect": null,
+      "text": "无效果。",
+      "flavor": "主体是一切衍生的基石",
+      "art": "o1000-existence.svg"
     }
   ]
 }

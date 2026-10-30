@@ -11,6 +11,18 @@ export const CARD_LIST = database.cards
 export const CARD_MAP = Object.fromEntries(CARD_LIST.map((card) => [card.id, card]))
 export const OTHER_PLAYER = { user: 'ai', ai: 'user' }
 export const HAND_LIMIT = 8
+export const DECK_MIN_SIZE = 30
+export const DECK_MAX_SIZE = 40
+export const CARD_COPY_LIMIT = 3
+export const LEVEL_DECK_LIMITS = { 灾祸: 12, 崩坏: 7, 终末: 3, 隐秘: 6 }
+export const SERIES_OPTIONS = ['均衡', 'A', 'B', 'C', 'O', 'Y']
+export const PLAYABLE_CARD_LIST = CARD_LIST.filter((card) => card.id !== 'O1000')
+
+export const DEFAULT_RECIPE = [
+  ['A1.1', 3], ['A1.2', 3], ['A1.3', 3], ['A1.4', 2], ['A1.5', 1],
+  ['B1.1', 2], ['B1.2', 1], ['B1.3', 3], ['B1.4', 3], ['B1.5', 1],
+  ['C1.1', 1], ['C1.2', 1], ['C1.3', 3], ['C1.4', 2], ['C1.5', 1],
+]
 
 let uidCounter = 0
 const clone = (value) => structuredClone(value)
@@ -65,13 +77,89 @@ export function randomDimensions(rng = Math.random) {
   return shuffle(DIMENSIONS.map((dim) => dim.id), rng).slice(0, 2)
 }
 
-export function buildDeck(owner) {
-  const recipe = [
-    ['A1.1', 2], ['A1.2', 2], ['A1.3', 2], ['A1.4', 2], ['A1.5', 2],
-    ['B1.1', 2], ['B1.2', 2], ['B1.3', 2], ['B1.4', 2], ['B1.5', 2],
-    ['C1.1', 2], ['C1.2', 2], ['C1.3', 2], ['C1.4', 2], ['C1.5', 2],
-  ]
-  return shuffle(recipe.flatMap(([id, count]) => Array.from({ length: count }, () => makeInstance(id, owner))))
+export function normalizeDeckRecipe(recipe) {
+  if (!Array.isArray(recipe)) return []
+  return recipe
+    .map(([id, count]) => [id, Math.max(0, Math.floor(Number(count) || 0))])
+    .filter(([, count]) => count > 0)
+}
+
+export function validateDeckRecipe(recipe) {
+  const errors = []
+  const levelCounts = {}
+  const cardCounts = {}
+  let total = 0
+
+  for (const [id, count] of normalizeDeckRecipe(recipe)) {
+    const def = CARD_MAP[id]
+    if (!def) {
+      errors.push(`未知卡牌：${id}`)
+      continue
+    }
+    if (id === 'O1000') {
+      errors.push('O1000是系统备用卡，不能进入卡组')
+      continue
+    }
+    if (count > CARD_COPY_LIMIT) errors.push(`「${def.name}」同名至多${CARD_COPY_LIMIT}张`)
+    total += count
+    cardCounts[id] = (cardCounts[id] || 0) + count
+    levelCounts[def.level] = (levelCounts[def.level] || 0) + count
+    const levelLimit = LEVEL_DECK_LIMITS[def.level]
+    if (levelLimit && levelCounts[def.level] > levelLimit) {
+      errors.push(`${def.level}级合计至多${levelLimit}张`)
+    }
+  }
+
+  if (total < DECK_MIN_SIZE) errors.push(`卡组至少${DECK_MIN_SIZE}张`)
+  if (total > DECK_MAX_SIZE) errors.push(`卡组至多${DECK_MAX_SIZE}张`)
+
+  return {
+    valid: errors.length === 0,
+    total,
+    levelCounts,
+    cardCounts,
+    errors: [...new Set(errors)],
+  }
+}
+
+export function buildRandomDeckRecipe({ tendency = '均衡', rng = Math.random } = {}) {
+  const targetSize = DECK_MIN_SIZE + Math.floor(rng() * (DECK_MAX_SIZE - DECK_MIN_SIZE + 1))
+  const recipe = new Map()
+  const cardCounts = {}
+  const levelCounts = {}
+
+  const canAdd = (def) => {
+    if ((cardCounts[def.id] || 0) >= CARD_COPY_LIMIT) return false
+    const levelLimit = LEVEL_DECK_LIMITS[def.level]
+    return !levelLimit || (levelCounts[def.level] || 0) < levelLimit
+  }
+  const addCard = (def) => {
+    recipe.set(def.id, (recipe.get(def.id) || 0) + 1)
+    cardCounts[def.id] = (cardCounts[def.id] || 0) + 1
+    levelCounts[def.level] = (levelCounts[def.level] || 0) + 1
+  }
+  const fill = (pool, amount) => {
+    for (let index = 0; index < amount; index += 1) {
+      const legal = pool.filter(canAdd)
+      if (!legal.length) return false
+      addCard(legal[Math.floor(rng() * legal.length)])
+    }
+    return true
+  }
+
+  if (tendency !== '均衡') {
+    const selectedPool = PLAYABLE_CARD_LIST.filter((card) => card.series === tendency)
+    const selectedTarget = Math.round(targetSize * (0.45 + rng() * 0.2))
+    fill(selectedPool, selectedTarget)
+  }
+  fill(PLAYABLE_CARD_LIST, targetSize - [...recipe.values()].reduce((sum, count) => sum + count, 0))
+
+  return [...recipe.entries()]
+}
+
+export function buildDeck(owner, recipe = DEFAULT_RECIPE) {
+  const safeRecipe = validateDeckRecipe(recipe).valid ? normalizeDeckRecipe(recipe) : DEFAULT_RECIPE
+  return shuffle(safeRecipe.flatMap(([id, count]) => Array.from({ length: count }, () => makeInstance(id, owner))))
 }
 
 function addLog(state, text, type = 'system') {
@@ -98,7 +186,7 @@ export function drawToFive(state, player) {
   }
 }
 
-export function createGame() {
+export function createGame({ userRecipe, aiRecipe } = {}) {
   const state = {
     round: 1,
     wins: { user: 0, ai: 0 },
@@ -108,7 +196,7 @@ export function createGame() {
     turn: { player: 'user', index: 0 },
     board: Array(6).fill(null),
     hands: { user: [], ai: [] },
-    decks: { user: buildDeck('user'), ai: buildDeck('ai') },
+    decks: { user: buildDeck('user', userRecipe), ai: buildDeck('ai', aiRecipe) },
     discards: { user: [], ai: [] },
     exiles: { user: [], ai: [], system: [] },
     logs: [],

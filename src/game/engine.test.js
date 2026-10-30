@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CARD_MAP, calculateScores, canPlay, completeRound, createGame, openRetention,
-  placeCard, revealStep, stopTurn,
+  CARD_MAP, DEFAULT_RECIPE, buildRandomDeckRecipe, calculateScores, canPlay, completeRound,
+  createGame, openRetention, placeCard, revealStep, stopTurn, validateDeckRecipe,
 } from './engine'
 
 function card(id, overrides = {}) {
@@ -176,5 +176,50 @@ describe('系统备用主世界', () => {
     game = stopTurn(game)
     expect(game.board[0].uid).not.toBe(firstUid)
     expect(game.board[0].stats).toEqual({ chaos: 1, barren: 1, disqualification: 1, calamity: 1 })
+  })
+})
+
+describe('卡组构筑规则', () => {
+  const whiteboardRecipe = DEFAULT_RECIPE
+
+  it('卡组必须为 30 至 40 张', () => {
+    expect(validateDeckRecipe([['A1.1', 29]]).valid).toBe(false)
+    expect(validateDeckRecipe(whiteboardRecipe).valid).toBe(true)
+    expect(validateDeckRecipe([['A1.1', 41]]).valid).toBe(false)
+  })
+
+  it('限制同名卡与灾祸、崩坏、终末数量', () => {
+    expect(validateDeckRecipe([['A1.1', 4]]).errors).toContain('「列鼎」同名至多3张')
+    expect(validateDeckRecipe([['A1.3', 13]]).errors).toContain('灾祸级合计至多12张')
+    expect(validateDeckRecipe([['A1.4', 3], ['B1.4', 3], ['C1.4', 2]]).errors).toContain('崩坏级合计至多7张')
+    expect(validateDeckRecipe([['A1.5', 3], ['B1.5', 1]]).errors).toContain('终末级合计至多3张')
+  })
+
+  it('系统备用卡与未知卡不能进入卡组', () => {
+    expect(validateDeckRecipe([['O1000', 30]]).valid).toBe(false)
+    expect(validateDeckRecipe([['X999', 30]]).errors).toContain('未知卡牌：X999')
+  })
+
+  it('各系列倾向的随机配方均符合构筑规则', () => {
+    for (const tendency of ['均衡', 'A', 'B', 'C', 'O', 'Y']) {
+      const recipe = buildRandomDeckRecipe({ tendency, rng: () => 0 })
+      const result = validateDeckRecipe(recipe)
+      expect(result.valid).toBe(true)
+      expect(result.total).toBeGreaterThanOrEqual(30)
+      expect(result.total).toBeLessThanOrEqual(40)
+      expect(result.levelCounts['灾祸'] || 0).toBeLessThanOrEqual(12)
+      expect(result.levelCounts['崩坏'] || 0).toBeLessThanOrEqual(7)
+      expect(result.levelCounts['终末'] || 0).toBeLessThanOrEqual(3)
+      expect(result.levelCounts['隐秘'] || 0).toBeLessThanOrEqual(6)
+    }
+  })
+
+  it('可以使用自定义配方创建对局', () => {
+    const userRecipe = [...whiteboardRecipe, ['B1.1', 1], ['C1.1', 1], ['C1.2', 1]]
+    const game = createGame({ userRecipe })
+    expect(validateDeckRecipe(userRecipe).valid).toBe(true)
+    expect(game.decks.user).toHaveLength(28)
+    expect(game.hands.user).toHaveLength(5)
+    expect(game.decks.ai).toHaveLength(25)
   })
 })

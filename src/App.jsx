@@ -2,13 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 import CardView from './components/CardView'
 import {
-  CARD_LIST, DIMENSIONS, canPlay, chooseAiCard, completeRound,
-  createGame, currentSlot, definition, openRetention, phaseName, placeCard, revealStep,
-  skipSlot, slotsFor, stopTurn,
+  CARD_LIST, CARD_COPY_LIMIT, DECK_MAX_SIZE, DIMENSIONS, LEVEL_DECK_LIMITS,
+  PLAYABLE_CARD_LIST, SERIES_OPTIONS, buildRandomDeckRecipe, canPlay, chooseAiCard,
+  completeRound, createGame, currentSlot, definition, openRetention, phaseName, placeCard,
+  revealStep, skipSlot, slotsFor, stopTurn, validateDeckRecipe,
 } from './game/engine'
 
 const PHASES = ['抽牌', '维度', '出牌', '拼点', '结算', '保留']
 const LEVELS = ['全部', '纯净', '萌芽', '灾祸', '崩坏', '终末', '隐秘']
+const LIMITED_LEVELS = ['灾祸', '崩坏', '终末', '隐秘']
 
 function Modal({ title, eyebrow, children, onClose, wide = false }) {
   useEffect(() => {
@@ -29,6 +31,12 @@ function Modal({ title, eyebrow, children, onClose, wide = false }) {
   )
 }
 
+function countsFromRecipe(recipe) {
+  const counts = Object.fromEntries(PLAYABLE_CARD_LIST.map((card) => [card.id, 0]))
+  for (const [id, count] of recipe) counts[id] = count
+  return counts
+}
+
 function App() {
   const [game, setGame] = useState(createGame)
   const [started, setStarted] = useState(false)
@@ -38,10 +46,19 @@ function App() {
   const [libraryFilter, setLibraryFilter] = useState('全部')
   const [search, setSearch] = useState('')
   const [logOpen, setLogOpen] = useState(false)
+  const [deckMode, setDeckMode] = useState('random')
+  const [seriesTendency, setSeriesTendency] = useState('均衡')
+  const [builderCounts, setBuilderCounts] = useState(() => countsFromRecipe(buildRandomDeckRecipe()))
+  const [activeDeckConfig, setActiveDeckConfig] = useState({ userRecipe: null, aiRecipe: null })
 
   const userTurn = started && game.phase === 'play' && game.turn.player === 'user'
   const activeSlot = currentSlot(game)
   const selectedCard = game.hands.user.find((card) => card.uid === selected)
+  const builderRecipe = useMemo(
+    () => Object.entries(builderCounts).filter(([, count]) => count > 0),
+    [builderCounts],
+  )
+  const builderValidation = useMemo(() => validateDeckRecipe(builderRecipe), [builderRecipe])
 
   useEffect(() => {
     if (!started || game.phase !== 'play' || game.turn.player !== 'ai') return undefined
@@ -61,7 +78,7 @@ function App() {
   }, [started, game])
 
   const restart = () => {
-    setGame(createGame())
+    setGame(createGame(activeDeckConfig))
     setSelected(null)
     setRetainUid(null)
     setModal(null)
@@ -73,6 +90,55 @@ function App() {
     const query = search.trim().toLowerCase()
     return levelMatch && (!query || `${card.id}${card.name}${card.text}`.toLowerCase().includes(query))
   }), [libraryFilter, search])
+
+  const levelCount = (level) => builderValidation.levelCounts[level] || 0
+
+  const canIncreaseCard = (def) => {
+    const count = builderCounts[def.id] || 0
+    if (count >= CARD_COPY_LIMIT || builderValidation.total >= DECK_MAX_SIZE) return false
+    const levelLimit = LEVEL_DECK_LIMITS[def.level]
+    return !levelLimit || levelCount(def.level) < levelLimit
+  }
+
+  const changeCardCount = (def, delta) => {
+    if (delta > 0 && !canIncreaseCard(def)) return
+    setBuilderCounts((previous) => ({
+      ...previous,
+      [def.id]: Math.max(0, Math.min(CARD_COPY_LIMIT, (previous[def.id] || 0) + delta)),
+    }))
+  }
+
+  const fillBuilder = () => {
+    setBuilderCounts(countsFromRecipe(buildRandomDeckRecipe({ tendency: seriesTendency })))
+  }
+
+  const clearBuilder = () => {
+    setBuilderCounts(countsFromRecipe([]))
+  }
+
+  const startGame = () => {
+    let config
+    if (deckMode === 'random') {
+      config = {
+        userRecipe: buildRandomDeckRecipe({ tendency: seriesTendency }),
+        aiRecipe: buildRandomDeckRecipe({ tendency: seriesTendency }),
+      }
+    } else {
+      if (!builderValidation.valid) return
+      config = {
+        userRecipe: builderRecipe,
+        aiRecipe: buildRandomDeckRecipe({
+          tendency: SERIES_OPTIONS[Math.floor(Math.random() * SERIES_OPTIONS.length)],
+        }),
+      }
+    }
+    setActiveDeckConfig(config)
+    setGame(createGame(config))
+    setSelected(null)
+    setRetainUid(null)
+    setModal(null)
+    setStarted(true)
+  }
 
   const playOnSlot = (slot) => {
     if (!userTurn || slot !== activeSlot || !selected) return
@@ -184,7 +250,11 @@ function App() {
 
         <aside className={`observer-log ${logOpen ? 'open' : ''}`}>
           <div className="log-header"><div><span className="eyebrow">OBSERVATION LOG</span><h2>校订记录</h2></div><span className="live-dot">LIVE</span></div>
-          <div className="deck-stats"><div><span>牌库</span><strong>{game.decks.user.length}</strong></div><div><span>弃牌</span><strong>{game.discards.user.length}</strong></div><div><span>放逐</span><strong>{game.exiles.user.length}</strong></div></div>
+          <div className="deck-stats">
+            <button className="deck-stat" onClick={() => setModal('deck')}><span>牌库</span><strong>{game.decks.user.length}</strong></button>
+            <button className="deck-stat" onClick={() => setModal('discard')}><span>弃牌</span><strong>{game.discards.user.length}</strong></button>
+            <div><span>放逐</span><strong>{game.exiles.user.length}</strong></div>
+          </div>
           <div className="log-list">
             {game.logs.map((log) => <div key={log.id} className={`log-item log-${log.type}`}><span>R{log.round}</span><p>{log.text}</p></div>)}
           </div>
@@ -200,12 +270,92 @@ function App() {
             <div className="title-symbol"><i /><span>WE</span><i /></div>
             <h1>世界熵</h1><h3>WORLD ENTROPY</h3>
             <p className="title-lead">当现实失去唯一的解释，<br />你将选择让世界成为什么。</p>
-            <button className="primary-button start-button" onClick={() => setStarted(true)}><span>开始校订</span><small>进入人机试玩 DEMO</small></button>
-            <div className="title-features"><span>公共主世界</span><i /> <span>暗牌显现</span><i /><span>四维博弈</span></div>
+            <button className="primary-button start-button" onClick={() => setModal('deckSetup')}><span>开始校订</span><small>选择或构筑 30～40 张卡组</small></button>
+            <div className="title-features"><span>公共主世界</span><i /> <span>暗牌显现</span><i /><span>卡组构筑</span></div>
             <button className="title-rules" onClick={() => setModal('rules')}>首次观测？阅读规则</button>
           </div>
           <div className="title-footer"><span>DEMO BUILD 0.1.0</span><span>卡牌数据与图片资源独立维护</span></div>
         </div>
+      )}
+
+      {modal === 'deckSetup' && (
+        <Modal title="选择卡组" eyebrow="DECK CONSTRUCTION" wide onClose={() => setModal(null)}>
+          <div className="setup-modes">
+            <button className={deckMode === 'random' ? 'active' : ''} onClick={() => setDeckMode('random')}>系统随机构筑</button>
+            <button className={deckMode === 'custom' ? 'active' : ''} onClick={() => setDeckMode('custom')}>自行构筑卡组</button>
+          </div>
+
+          {deckMode === 'random' ? (
+            <div className="setup-section">
+              <p className="setup-intro">系统将为双方分别生成 30～40 张合法卡组，并在构建时遵守同名与等级数量限制。</p>
+              <div className="filter-row series-row">
+                {SERIES_OPTIONS.map((series) => <button key={series} className={seriesTendency === series ? 'active' : ''} onClick={() => setSeriesTendency(series)}>{series === '均衡' ? '均衡' : `${series} 系列倾向`}</button>)}
+              </div>
+            </div>
+          ) : (
+            <div className="setup-section">
+              <div className="builder-summary">
+                <div><span>总数</span><strong>{builderValidation.total}／{DECK_MAX_SIZE}</strong></div>
+                {LIMITED_LEVELS.map((level) => {
+                  const count = levelCount(level)
+                  const limit = LEVEL_DECK_LIMITS[level]
+                  return <div key={level} className={count > limit ? 'over' : ''}><span>{level}</span><strong>{count}／{limit}</strong></div>
+                })}
+                <div><span>同名</span><strong>≤ {CARD_COPY_LIMIT}</strong></div>
+              </div>
+              {!builderValidation.valid && (
+                <div className="builder-errors">
+                  {builderValidation.errors.map((error) => <p key={error} className="builder-error">{error}</p>)}
+                </div>
+              )}
+              <div className="builder-actions">
+                <button className="secondary-button" onClick={fillBuilder}>按当前倾向随机填充</button>
+                <button className="secondary-button" onClick={clearBuilder}>清空卡组</button>
+              </div>
+              <div className="builder-list">
+                {PLAYABLE_CARD_LIST.map((def) => {
+                  const count = builderCounts[def.id] || 0
+                  const stats = DIMENSIONS.map((dim) => `${dim.short}${def.stats[dim.id]}`).join('／')
+                  return (
+                    <div key={def.id} className={`builder-row ${count > 0 ? 'selected' : ''}`}>
+                      <span className="builder-series">{def.series}</span>
+                      <div className="builder-card">
+                        <strong>{def.id}－{def.name}</strong>
+                        <small>{def.level} · {stats}</small>
+                      </div>
+                      <div className="count-controls">
+                        <button onClick={() => changeCardCount(def, -1)} disabled={!count} aria-label={`减少${def.name}`}>−</button>
+                        <b>{count}</b>
+                        <button onClick={() => changeCardCount(def, 1)} disabled={!canIncreaseCard(def)} aria-label={`增加${def.name}`}>＋</button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="setup-footer">
+            <p>组卡规则：30～40 张；同名至多 {CARD_COPY_LIMIT} 张；灾祸≤{LEVEL_DECK_LIMITS['灾祸']}、崩坏≤{LEVEL_DECK_LIMITS['崩坏']}、终末≤{LEVEL_DECK_LIMITS['终末']}、隐秘≤{LEVEL_DECK_LIMITS['隐秘']}。</p>
+            <button className="primary-button setup-start" disabled={deckMode === 'custom' && !builderValidation.valid} onClick={startGame}>确认并开始</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal === 'deck' && (
+        <Modal title={`你的牌库（${game.decks.user.length}）`} eyebrow="YOUR DECK" wide onClose={() => setModal(null)}>
+          {game.decks.user.length ? (
+            <div className="library-grid zone-grid">{game.decks.user.map((card) => <CardView key={card.uid} card={card} faceUp />)}</div>
+          ) : <p className="zone-empty">牌库为空。弃牌区会在下一次抽牌时洗回牌库。</p>}
+        </Modal>
+      )}
+
+      {modal === 'discard' && (
+        <Modal title={`你的弃牌区（${game.discards.user.length}）`} eyebrow="YOUR DISCARD" wide onClose={() => setModal(null)}>
+          {game.discards.user.length ? (
+            <div className="library-grid zone-grid">{game.discards.user.map((card) => <CardView key={card.uid} card={card} faceUp />)}</div>
+          ) : <p className="zone-empty">弃牌区为空。</p>}
+        </Modal>
       )}
 
       {game.phase === 'roundEnd' && game.roundResult && (
@@ -248,9 +398,10 @@ function App() {
         <Modal title="校订规则速查" eyebrow="HOW TO PLAY" wide onClose={() => setModal(null)}>
           <div className="rules-layout">
             <section><span className="rule-number">01</span><h3>目标</h3><p>与对手争夺同一世界的解释权。每回合高分者获得 1 胜点，同分各得 1 点；先到 5 胜。</p></section>
-            <section><span className="rule-number">02</span><h3>放置</h3><p>先手使用 1、3、5 号位，后手使用 2、4、6 号位，可单独跳过当前位置。1 号主世界默认明牌，其余里世界默认暗牌。若先手结束放置时主世界为空，系统将明牌置入「存在」。</p></section>
-            <section><span className="rule-number">03</span><h3>显现</h3><p>双方停止出牌后，按 1→6 逐张翻开并结算效果。主世界是双方公共乘数，里世界分别提供加数。</p></section>
-            <section><span className="rule-number">04</span><h3>保留</h3><p>回合结束至多保留 1 张手牌。每回合开始补至 5 张；先手交替，高等级卡牌随回合开放。</p></section>
+            <section><span className="rule-number">02</span><h3>组卡</h3><p>卡组 30～40 张，同名至多 3 张；灾祸级≤12、崩坏级≤7、终末级≤3、隐秘级≤6。可自行构筑，也可由系统按系列倾向随机构筑。</p></section>
+            <section><span className="rule-number">03</span><h3>放置</h3><p>先手使用 1、3、5 号位，后手使用 2、4、6 号位，可单独跳过当前位置。1 号主世界默认明牌，其余里世界默认暗牌。若先手结束放置时主世界为空，系统将明牌置入「存在」。</p></section>
+            <section><span className="rule-number">04</span><h3>显现</h3><p>双方停止出牌后，按 1→6 逐张翻开并结算效果。主世界是双方公共乘数，里世界分别提供加数。</p></section>
+            <section><span className="rule-number">05</span><h3>保留</h3><p>回合结束至多保留 1 张手牌。每回合开始补至 5 张；先手交替，高等级卡牌随回合开放。牌库与弃牌区可随时查看。</p></section>
           </div>
           <div className="formula-box"><span>默认计分公式</span><code>先手＝Σ 主世界 ×（3号＋5号）</code><code>后手＝Σ 主世界 ×（2号＋4号＋6号）</code></div>
           <div className="rules-dims">{DIMENSIONS.map((dim) => <span key={dim.id} style={{ '--dim-color': dim.color }}><i />{dim.name}</span>)}</div>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ANCHOR, CARD_MAP, calculateScores, canPlay, completeRound, createGame, openRetention,
+  CARD_MAP, calculateScores, canPlay, completeRound, createGame, openRetention,
   placeCard, revealStep, stopTurn,
 } from './engine'
 
@@ -41,7 +41,7 @@ describe('卡组与回合基础', () => {
 })
 
 describe('计分公式', () => {
-  it('先手每个维度获得锚定值 3', () => {
+  it('先手只计算三号位与五号位的维度值', () => {
     const game = createGame()
     game.dimensions = ['chaos', 'barren']
     game.board = Array(6).fill(null)
@@ -52,10 +52,9 @@ describe('计分公式', () => {
     game.board[3] = card('O1', { faceUp: true, stats: { chaos: 2, barren: 1, disqualification: 0, calamity: 0 } })
     game.board[5] = card('O1', { faceUp: true, stats: { chaos: 2, barren: 1, disqualification: 0, calamity: 0 } })
     const result = calculateScores(game)
-    expect(ANCHOR).toBe(3)
-    expect(result.firstScore).toBe(26)
+    expect(result.firstScore).toBe(14)
     expect(result.secondScore).toBe(18)
-    expect(result.userScore).toBe(26)
+    expect(result.userScore).toBe(14)
   })
 
   it('空天将空无视为 2，并启用全部四维', () => {
@@ -64,7 +63,7 @@ describe('计分公式', () => {
     game.board[0] = card('C1', { faceUp: true })
     const result = calculateScores(game)
     expect(result.dimensions).toHaveLength(4)
-    expect(result.firstScore).toBe(24)
+    expect(result.firstScore).toBe(0)
     expect(result.secondScore).toBe(0)
   })
 })
@@ -131,7 +130,7 @@ describe('连续回合', () => {
 })
 
 describe('系统备用主世界', () => {
-  it('先手无法出牌时生成存在，双方空里世界时先手获得 6 分', () => {
+  it('先手无法出牌时生成存在，双方空里世界时双方获得 0 分', () => {
     let game = createGame()
     game.dimensions = ['chaos', 'barren']
     game.hands.user = []
@@ -144,10 +143,10 @@ describe('系统备用主世界', () => {
     game = stopTurn(game)
     game = revealStep(game)
     expect(game.phase).toBe('roundEnd')
-    expect(game.roundResult.firstScore).toBe(6)
+    expect(game.roundResult.firstScore).toBe(0)
     expect(game.roundResult.secondScore).toBe(0)
     expect(game.wins.user).toBe(1)
-    expect(game.wins.ai).toBe(0)
+    expect(game.wins.ai).toBe(1)
   })
 
   it('先手已有主世界时不生成存在', () => {

@@ -11,7 +11,6 @@ export const CARD_LIST = database.cards
 export const CARD_MAP = Object.fromEntries(CARD_LIST.map((card) => [card.id, card]))
 export const OTHER_PLAYER = { user: 'ai', ai: 'user' }
 export const HAND_LIMIT = 8
-export const ANCHOR = 3
 
 let uidCounter = 0
 const clone = (value) => structuredClone(value)
@@ -313,6 +312,16 @@ function ensureMainWorld(state) {
   revealInstance(state, 1)
 }
 
+export function skipSlot(source) {
+  if (source.phase !== 'play') return source
+  const state = clone(source)
+  const slot = currentSlot(state)
+  addLog(state, `${state.turn.player === 'user' ? '你' : '对手'}跳过${slot}号位。`)
+  if (slot === 1 && state.turn.player === state.firstPlayer) ensureMainWorld(state)
+  advanceTurn(state)
+  return state
+}
+
 export function stopTurn(source) {
   if (source.phase !== 'play') return source
   const state = clone(source)
@@ -344,7 +353,7 @@ export function calculateScores(state) {
     const multiplier = mainStat(main, dim)
     const firstInner = [3, 5].reduce((sum, slot) => sum + (state.board[slot - 1] ? effectiveStats(state.board[slot - 1])[dim] : 0), 0)
     const secondInner = [2, 4, 6].reduce((sum, slot) => sum + (state.board[slot - 1] ? effectiveStats(state.board[slot - 1])[dim] : 0), 0)
-    firstScore += multiplier * (ANCHOR + firstInner)
+    firstScore += multiplier * firstInner
     secondScore += multiplier * secondInner
   }
   firstScore = Math.max(0, firstScore)

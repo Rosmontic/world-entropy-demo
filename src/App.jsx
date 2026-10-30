@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 import CardView from './components/CardView'
 import {
-  ANCHOR, CARD_LIST, DIMENSIONS, canPlay, chooseAiCard, completeRound,
+  CARD_LIST, DIMENSIONS, canPlay, chooseAiCard, completeRound,
   createGame, currentSlot, definition, openRetention, phaseName, placeCard, revealStep,
-  slotsFor, stopTurn,
+  skipSlot, slotsFor, stopTurn,
 } from './game/engine'
 
 const PHASES = ['抽牌', '维度', '出牌', '拼点', '结算', '保留']
@@ -165,7 +165,7 @@ function App() {
                 <span className="eyebrow">{userTurn ? 'YOUR OBSERVATION' : 'OPPOSING OBSERVER'}</span>
                 <strong>{game.phase === 'reveal' ? '世界正在逐张显现' : game.phase === 'play' ? (userTurn ? `请选择卡牌，放入 ${activeSlot} 号位` : '对手正在植入世界……') : phaseName(game)}</strong>
               </div>
-              <div className="action-hint">先手锚定值 <b>＋{ANCHOR}</b></div>
+              <button className="secondary-button" disabled={!userTurn} onClick={() => setGame((previous) => skipSlot(previous))}>跳过此位</button>
               <button className="secondary-button" disabled={!userTurn} onClick={() => setGame((previous) => stopTurn(previous))}>停止出牌</button>
             </div>
           </section>
@@ -248,11 +248,11 @@ function App() {
         <Modal title="校订规则速查" eyebrow="HOW TO PLAY" wide onClose={() => setModal(null)}>
           <div className="rules-layout">
             <section><span className="rule-number">01</span><h3>目标</h3><p>与对手争夺同一世界的解释权。每回合高分者获得 1 胜点，同分各得 1 点；先到 5 胜。</p></section>
-            <section><span className="rule-number">02</span><h3>放置</h3><p>先手使用 1、3、5 号位，后手使用 2、4、6 号位。1 号主世界默认明牌，其余里世界默认暗牌。若先手停止时主世界为空，系统将明牌置入「存在」。</p></section>
+            <section><span className="rule-number">02</span><h3>放置</h3><p>先手使用 1、3、5 号位，后手使用 2、4、6 号位，可单独跳过当前位置。1 号主世界默认明牌，其余里世界默认暗牌。若先手结束放置时主世界为空，系统将明牌置入「存在」。</p></section>
             <section><span className="rule-number">03</span><h3>显现</h3><p>双方停止出牌后，按 1→6 逐张翻开并结算效果。主世界是双方公共乘数，里世界分别提供加数。</p></section>
             <section><span className="rule-number">04</span><h3>保留</h3><p>回合结束至多保留 1 张手牌。每回合开始补至 5 张；先手交替，高等级卡牌随回合开放。</p></section>
           </div>
-          <div className="formula-box"><span>默认计分公式</span><code>先手＝Σ 主世界 ×（3＋3号＋5号）</code><code>后手＝Σ 主世界 ×（2号＋4号＋6号）</code></div>
+          <div className="formula-box"><span>默认计分公式</span><code>先手＝Σ 主世界 ×（3号＋5号）</code><code>后手＝Σ 主世界 ×（2号＋4号＋6号）</code></div>
           <div className="rules-dims">{DIMENSIONS.map((dim) => <span key={dim.id} style={{ '--dim-color': dim.color }}><i />{dim.name}</span>)}</div>
         </Modal>
       )}

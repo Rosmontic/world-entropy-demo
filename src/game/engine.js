@@ -67,8 +67,9 @@ export function randomDimensions(rng = Math.random) {
 
 export function buildDeck(owner) {
   const recipe = [
-    ['O1', 3], ['O2', 3], ['O3', 3], ['C31', 3], ['C32', 3], ['B9', 3],
-    ['A23', 2], ['Y2', 2], ['A4', 2], ['A66', 2], ['Y96', 2], ['C1', 2],
+    ['A1.1', 2], ['A1.2', 2], ['A1.3', 2], ['A1.4', 2], ['A1.5', 2],
+    ['B1.1', 2], ['B1.2', 2], ['B1.3', 2], ['B1.4', 2], ['B1.5', 2],
+    ['C1.1', 2], ['C1.2', 2], ['C1.3', 2], ['C1.4', 2], ['C1.5', 2],
   ]
   return shuffle(recipe.flatMap(([id, count]) => Array.from({ length: count }, () => makeInstance(id, owner))))
 }

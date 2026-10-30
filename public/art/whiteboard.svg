@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="380" viewBox="0 0 600 380" role="img" aria-labelledby="title desc">
+<title id="title">白板测试卡</title><desc id="desc">世界熵 A／B／C 系列白板测试卡通用矢量卡图</desc>
+<defs><radialGradient id="bg" cx="50%" cy="45%" r="75%"><stop offset="0" stop-color="#303946"/><stop offset="1" stop-color="#090d11"/></radialGradient><filter id="glow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<rect width="600" height="380" rx="18" fill="url(#bg)"/>
+<g filter="url(#glow)" fill="none" stroke="#c8d0dc" stroke-width="3" stroke-opacity=".78"><path d="M82 295V95h436v200H82Z"/><path d="M116 258h120M116 224h176M116 190h92"/><path d="M420 110l58 58M478 110l-58 58" opacity=".7"/><path d="M82 331h436" opacity=".45"/></g>
+<g fill="#c8d0dc" font-family="monospace" font-size="22" text-anchor="middle" opacity=".8"><text x="300" y="72">WHITEBOARD</text><text x="300" y="348" font-size="16">NUMERIC TEST CARD</text></g>
+</svg>

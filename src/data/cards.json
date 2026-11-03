@@ -3,7 +3,7 @@
   "set": {
     "id": "WE-DEMO-01",
     "name": "第一次失名",
-    "version": "0.1.0",
+    "version": "0.12.0",
     "language": "zh-CN"
   },
   "cards": [
@@ -172,7 +172,7 @@
       "keywords": [],
       "trigger": "保留",
       "effect": "hive",
-      "text": "［保留］此牌混沌＋1。",
+      "text": "［保留］此牌混沌永久＋1。",
       "flavor": "蜂巢网络终端作为全人类的虚拟归属，如梦似幻。",
       "art": "b9-hive.svg"
     },

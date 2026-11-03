@@ -29,6 +29,7 @@ export default function CardView({ card, faceUp = true, compact = false, selecte
             <img src={artUrl(def)} alt={`${def.name}卡图`} className="card-art" draggable="false" />
             <span className={`level level-${def.level}`}>{def.level}</span>
             <span className="card-series">{def.series}</span>
+            {def.id === 'O1000' && <span className="system-tag">系统备用卡</span>}
           </div>
           <div className="card-heading">
             <span className="card-id">{def.id}</span>
@@ -44,6 +45,7 @@ export default function CardView({ card, faceUp = true, compact = false, selecte
           {!compact && (
             <div className="card-rules">
               {def.keywords.length > 0 && <div className="keyword-row">{def.keywords.map((word) => <span key={word}>｛{word}｝</span>)}</div>}
+              {card.triggerRemaining != null && <div className="trigger-count">显现剩余 {card.triggerRemaining}</div>}
               <p>{def.text}</p>
             </div>
           )}

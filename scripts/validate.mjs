@@ -2,8 +2,11 @@ import { spawn } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { chromium } from 'playwright-core'
+import { createGame } from '../src/game/engine.js'
 
 const root = process.cwd()
+const humanFirstSeed = Array.from({ length: 100 }, (_, index) => `validate-${index}`)
+  .find((seed) => createGame({ seed }).firstPlayer === 'user')
 const artifacts = path.join(root, 'artifacts')
 await mkdir(artifacts, { recursive: true })
 
@@ -63,6 +66,9 @@ try {
 
   await page.getByRole('button', { name: '开始校订' }).click()
   await page.getByRole('heading', { name: '选择卡组' }).waitFor()
+  await page.getByRole('textbox', { name: '随机种子' }).fill(humanFirstSeed)
+  if (!await page.getByRole('button', { name: /复制 seed/ }).isVisible()) throw new Error('缺少复制 seed 控件')
+  if (!await page.getByRole('button', { name: '随机 seed' }).isVisible()) throw new Error('缺少随机 seed 控件')
 
   await page.getByRole('button', { name: '自行构筑卡组' }).click()
   const customStart = page.getByRole('button', { name: '确认并开始' })
@@ -78,8 +84,10 @@ try {
   await page.getByRole('button', { name: '返回标题' }).click()
   await page.getByRole('button', { name: '开始校订' }).click()
   await page.getByRole('heading', { name: '选择卡组' }).waitFor()
+  await page.getByRole('textbox', { name: '随机种子' }).fill(humanFirstSeed)
   await page.getByRole('button', { name: '系统随机构筑' }).click()
   await page.getByRole('button', { name: '确认并开始' }).click()
+  await page.locator('.seed-current code').filter({ hasText: humanFirstSeed }).waitFor()
 
   await page.getByRole('button', { name: /卡牌库/ }).click()
   const libraryCards = await page.locator('.library-grid .game-card').count()
@@ -107,20 +115,22 @@ try {
   await page.locator('.board-slot.occupied').first().waitFor()
   await page.screenshot({ path: path.join(artifacts, 'gameplay.png'), fullPage: true })
 
-  await page.getByRole('button', { name: '停止出牌' }).click()
-  await page.getByRole('button', { name: '进入弃牌与保留' }).waitFor({ timeout: 30000 })
-  await page.getByRole('button', { name: '进入弃牌与保留' }).click()
-  await page.getByRole('button', { name: '完成校订，进入下一回合' }).waitFor()
-  await page.getByRole('button', { name: '完成校订，进入下一回合' }).click()
+  await page.getByRole('button', { name: /停止出牌/ }).click()
+  await page.getByRole('button', { name: '完成保留并结算' }).waitFor({ timeout: 30000 })
+  await page.getByRole('button', { name: '完成保留并结算' }).click()
+  await page.getByRole('button', { name: '进入下一回合' }).waitFor()
+  await page.getByRole('button', { name: '进入下一回合' }).click()
   await page.getByText('第 2 回合', { exact: true }).waitFor()
 
   await page.getByRole('button', { name: '重新开始' }).click()
-  await page.getByRole('button', { name: '停止出牌' }).click()
+  const restartStop = page.getByRole('button', { name: /停止出牌/ })
+  if (!(await restartStop.isDisabled())) await restartStop.click()
   await page.locator('.main-slot .card-id').filter({ hasText: 'O1000' }).waitFor()
   await page.screenshot({ path: path.join(artifacts, 'system-main.png'), fullPage: true })
-  await page.getByRole('button', { name: '进入弃牌与保留' }).waitFor({ timeout: 30000 })
-  await page.getByRole('button', { name: '进入弃牌与保留' }).click()
-  await page.getByRole('button', { name: '完成校订，进入下一回合' }).click()
+  await page.getByRole('button', { name: '完成保留并结算' }).waitFor({ timeout: 30000 })
+  await page.getByRole('button', { name: '完成保留并结算' }).click()
+  await page.getByRole('button', { name: '进入下一回合' }).waitFor()
+  await page.getByRole('button', { name: '进入下一回合' }).click()
   await page.getByText('第 2 回合', { exact: true }).waitFor()
 
   const brokenImages = await page.locator('img').evaluateAll((images) => images.filter((image) => !image.complete || image.naturalWidth === 0).map((image) => image.src))
@@ -134,7 +144,7 @@ try {
 
   const report = {
     ok: true,
-    checks: ['标题页', '自行构筑卡组', '随机构筑开局', '28 张卡牌库', '卡牌搜索', '规则弹窗', '5 张开局手牌', '6 个战场位置', '牌库查看', '弃牌区查看', '点击出牌', '系统备用主世界', 'AI 自动出牌', '逐张显现', '回合结算', '保留并进入下一回合', '图片加载', '手机布局'],
+    checks: ['标题页', 'seed 控件', '自行构筑卡组', '随机构筑开局', '28 张卡牌库', '卡牌搜索', '规则弹窗', '5 张开局手牌', '6 个战场位置', '牌库查看', '弃牌区查看', '点击出牌', '系统备用主世界', 'AI 自动出牌', '逐张显现', '保留先于结算', '进入下一回合', '图片加载', '手机布局'],
     screenshots: ['artifacts/title.png', 'artifacts/gameplay.png', 'artifacts/system-main.png', 'artifacts/mobile.png'],
     consoleErrors: errors,
   }

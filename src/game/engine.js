@@ -11,12 +11,16 @@ export const CARD_LIST = database.cards
 export const CARD_MAP = Object.fromEntries(CARD_LIST.map((card) => [card.id, card]))
 export const OTHER_PLAYER = { user: 'ai', ai: 'user' }
 export const HAND_LIMIT = 8
+export const DECK_LIMIT = 60
+export const DISCARD_LIMIT = 60
+export const MAX_ROUNDS = 9
 export const DECK_MIN_SIZE = 30
 export const DECK_MAX_SIZE = 40
 export const CARD_COPY_LIMIT = 3
-export const LEVEL_DECK_LIMITS = { 灾祸: 12, 崩坏: 7, 终末: 3, 隐秘: 6 }
+export const LEVEL_DECK_LIMITS = { 灾祸: 12, 崩坏: 7, 终末: 3 }
 export const SERIES_OPTIONS = ['均衡', 'A', 'B', 'C', 'O', 'Y']
 export const PLAYABLE_CARD_LIST = CARD_LIST.filter((card) => card.id !== 'O1000')
+export const ZONE_DISPLAY_ORDER = ['终末', '崩坏', '灾祸', '萌芽', '纯净', '隐秘']
 
 export const DEFAULT_RECIPE = [
   ['A1.1', 3], ['A1.2', 3], ['A1.3', 3], ['A1.4', 2], ['A1.5', 1],
@@ -24,20 +28,92 @@ export const DEFAULT_RECIPE = [
   ['C1.1', 1], ['C1.2', 1], ['C1.3', 3], ['C1.4', 2], ['C1.5', 1],
 ]
 
+const BASE_STAT_MINIMUM = 0
+const BASE_STAT_MAXIMUM = 6
+const zoneDisplayRank = Object.fromEntries(ZONE_DISPLAY_ORDER.map((level, index) => [level, index]))
+
 let uidCounter = 0
 const clone = (value) => structuredClone(value)
-const clamp = (value) => Math.max(0, Math.min(6, value))
+const clampBaseStat = (value) => Math.max(BASE_STAT_MINIMUM, Math.min(BASE_STAT_MAXIMUM, value))
+
+function hashSeed(seed) {
+  const source = String(seed ?? '')
+  let hash = 2166136261
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return hash >>> 0
+}
+
+function nextRngState(state) {
+  let value = (state + 0x6D2B79F5) >>> 0
+  let mixed = Math.imul(value ^ (value >>> 15), value | 1)
+  mixed ^= mixed + Math.imul(mixed ^ (mixed >>> 7), mixed | 61)
+  return {
+    state: value,
+    value: ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296,
+  }
+}
+
+function createSeededRandom(seed) {
+  let state = hashSeed(seed)
+  return {
+    next() {
+      const next = nextRngState(state)
+      state = next.state
+      return next.value
+    },
+    currentState() {
+      return state
+    },
+  }
+}
+
+export function randomSeed() {
+  return `${Date.now().toString(36)}-${Math.floor(Math.random() * 0xffffffff).toString(36)}`
+}
+
+export function seededRandom(seed) {
+  return createSeededRandom(seed).next
+}
+
+function drawRandom(state) {
+  if (typeof state?.rngState !== 'number') return Math.random()
+  const next = nextRngState(state.rngState)
+  state.rngState = next.state
+  return next.value
+}
 
 export function definition(card) {
   return CARD_MAP[card.cardId || card.id]
 }
 
+function baseStatValue(value) {
+  return typeof value === 'number' ? clampBaseStat(value) : 0
+}
+
 export function effectiveStats(card) {
   const result = {}
   for (const dim of DIMENSIONS) {
-    const base = card.stats?.[dim.id] ?? 0
-    const numeric = typeof base === 'number' ? base : 0
-    result[dim.id] = clamp(numeric + (card.tempStats?.[dim.id] || 0))
+    const base = baseStatValue(card.stats?.[dim.id])
+    const permanent = card.permanentStats?.[dim.id] || 0
+    const temporary = card.tempStats?.[dim.id] || 0
+    const aura = card.auraStats?.[dim.id] || 0
+    result[dim.id] = Math.floor(base + permanent + temporary + aura)
+  }
+  return result
+}
+
+export function resolveStats(card, rng = Math.random) {
+  const result = {}
+  for (const dim of DIMENSIONS) {
+    const baseValue = card.stats?.[dim.id]
+    const randomBase = baseValue === '?' ? 1 + Math.floor(rng() * 6) : baseStatValue(baseValue)
+    const permanent = card.permanentStats?.[dim.id] || 0
+    const aura = card.auraStats?.[dim.id] || 0
+    const temporary = baseValue === '?' ? 0 : (card.tempStats?.[dim.id] || 0)
+    result[dim.id] = Math.floor(randomBase + permanent + aura + temporary)
   }
   return result
 }
@@ -57,18 +133,21 @@ function makeInstance(cardId, owner, generated = false) {
     owner,
     stats: clone(def.stats),
     keywords: [...def.keywords],
+    permanentStats: {},
     tempStats: {},
+    auraStats: {},
+    tempExpiryRound: null,
+    triggerRemaining: def.triggerLimit ?? null,
     generated,
     faceUp: false,
-    hasRevealed: false,
   }
 }
 
 export function shuffle(items, rng = Math.random) {
   const result = [...items]
-  for (let i = result.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(rng() * (i + 1))
-    ;[result[i], result[j]] = [result[j], result[i]]
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(rng() * (index + 1))
+    ;[result[index], result[randomIndex]] = [result[randomIndex], result[index]]
   }
   return result
 }
@@ -157,9 +236,10 @@ export function buildRandomDeckRecipe({ tendency = '均衡', rng = Math.random }
   return [...recipe.entries()]
 }
 
-export function buildDeck(owner, recipe = DEFAULT_RECIPE) {
+export function buildDeck(owner, recipe = DEFAULT_RECIPE, rng = Math.random) {
   const safeRecipe = validateDeckRecipe(recipe).valid ? normalizeDeckRecipe(recipe) : DEFAULT_RECIPE
-  return shuffle(safeRecipe.flatMap(([id, count]) => Array.from({ length: count }, () => makeInstance(id, owner))))
+  const instances = safeRecipe.flatMap(([id, count]) => Array.from({ length: count }, () => makeInstance(id, owner)))
+  return shuffle(instances, rng)
 }
 
 function addLog(state, text, type = 'system') {
@@ -167,10 +247,17 @@ function addLog(state, text, type = 'system') {
   state.logs = state.logs.slice(0, 80)
 }
 
+export function addCardToDeck(state, player, card) {
+  if (state.decks[player].length >= DECK_LIMIT) return false
+  state.decks[player].push(card)
+  return true
+}
+
 function drawOne(state, player) {
   if (state.hands[player].length >= HAND_LIMIT) return null
   if (state.decks[player].length === 0 && state.discards[player].length > 0) {
-    state.decks[player] = shuffle(state.discards[player])
+    const recycled = shuffle(state.discards[player], () => drawRandom(state))
+    state.decks[player] = recycled.slice(0, DECK_LIMIT)
     state.discards[player] = []
     addLog(state, `${player === 'user' ? '你' : '对手'}将弃牌区洗回牌库。`)
   }
@@ -186,29 +273,44 @@ export function drawToFive(state, player) {
   }
 }
 
-export function createGame({ userRecipe, aiRecipe } = {}) {
+function createTurn(player) {
+  return { player, activeSlot: null, skippedSlots: [] }
+}
+
+export function createGame({ userRecipe, aiRecipe, seed = randomSeed(), firstPlayer = null } = {}) {
+  const rng = createSeededRandom(seed)
+  const chosenFirstPlayer = ['user', 'ai'].includes(firstPlayer)
+    ? firstPlayer
+    : (rng.next() < 0.5 ? 'user' : 'ai')
   const state = {
+    seed,
+    rngState: rng.currentState(),
     round: 1,
     wins: { user: 0, ai: 0 },
-    firstPlayer: 'user',
+    firstPlayer: chosenFirstPlayer,
     phase: 'play',
-    dimensions: randomDimensions(),
-    turn: { player: 'user', index: 0 },
+    dimensions: randomDimensions(rng.next),
+    turn: createTurn(chosenFirstPlayer),
     board: Array(6).fill(null),
     hands: { user: [], ai: [] },
-    decks: { user: buildDeck('user', userRecipe), ai: buildDeck('ai', aiRecipe) },
+    decks: {
+      user: buildDeck('user', userRecipe, rng.next),
+      ai: buildDeck('ai', aiRecipe, rng.next),
+    },
     discards: { user: [], ai: [] },
     exiles: { user: [], ai: [], system: [] },
+    removedCards: { user: [], ai: [], system: [] },
     logs: [],
     revealQueue: [],
     revealIndex: 0,
+    pendingScoreBoard: null,
     roundResult: null,
     gameWinner: null,
   }
   drawToFive(state, 'user')
   drawToFive(state, 'ai')
-  addLog(state, '第一次校订开始。你获得先手。', 'important')
-  addLog(state, `本回合维度：${state.dimensions.map((id) => DIMENSIONS.find((d) => d.id === id).name).join('、')}。`)
+  addLog(state, '第一次校订开始。', 'important')
+  addLog(state, `本回合维度：${state.dimensions.map((id) => DIMENSIONS.find((dim) => dim.id === id).name).join('、')}。`)
   return state
 }
 
@@ -216,9 +318,22 @@ export function slotsFor(player, firstPlayer) {
   return player === firstPlayer ? [1, 3, 5] : [2, 4, 6]
 }
 
+export function availableSlots(state, player = state.turn.player) {
+  return slotsFor(player, state.firstPlayer).filter((slot) => !state.board[slot - 1])
+}
+
 export function currentSlot(state) {
   if (state.phase !== 'play') return null
-  return slotsFor(state.turn.player, state.firstPlayer)[state.turn.index]
+  const slots = availableSlots(state)
+  if (state.turn.activeSlot && slots.includes(state.turn.activeSlot)) return state.turn.activeSlot
+  return slots[0] ?? null
+}
+
+export function selectSlot(source, slot) {
+  if (source.phase !== 'play' || !availableSlots(source).includes(slot)) return source
+  const state = clone(source)
+  state.turn.activeSlot = slot
+  return state
 }
 
 export function canPlay(card, slot, round) {
@@ -231,32 +346,56 @@ export function canPlay(card, slot, round) {
   return true
 }
 
-function modifyStat(state, card, dim, amount, temporary = false) {
+function activeMainEffect(state) {
+  const main = state.board[0]
+  return main?.faceUp ? definition(main).effect : null
+}
+
+function modifyStat(state, card, dim, amount, duration = 'temporary') {
   const def = definition(card)
   if (def.effect === 'emptySky') return
-  if (def.effect === 'silentPact' && amount > 0) return
-  if (temporary) {
-    card.tempStats ||= {}
-    card.tempStats[dim] = (card.tempStats[dim] || 0) + amount
-    const base = typeof card.stats[dim] === 'number' ? card.stats[dim] : 0
-    card.tempStats[dim] = clamp(base + card.tempStats[dim]) - base
-  } else {
-    const base = typeof card.stats[dim] === 'number' ? card.stats[dim] : 0
-    card.stats[dim] = clamp(base + amount)
+  if (activeMainEffect(state) === 'silentPact' && amount > 0) return
+  if (duration === 'permanent') {
+    card.permanentStats[dim] = (card.permanentStats[dim] || 0) + amount
+    return
   }
+  card.tempStats[dim] = (card.tempStats[dim] || 0) + amount
+}
+
+function canTriggerReveal(def, slot) {
+  if (def.trigger !== '显现') return false
+  if (def.triggerVariant === '边界' && slot === 1) return false
+  if (def.triggerVariant === '中枢' && slot !== 1) return false
+  return true
+}
+
+function consumeRevealLimit(card, def) {
+  if (def.triggerLimit == null) return true
+  if (card.triggerRemaining == null) card.triggerRemaining = def.triggerLimit
+  if (card.triggerRemaining <= 0) return false
+  card.triggerRemaining -= 1
+  return true
+}
+
+function applyAuraJudgments(state) {
+  return activeMainEffect(state)
+}
+
+function applyAuraResolutions(state) {
+  return state.board.some((card) => card?.faceUp && definition(card).trigger === '主导')
 }
 
 function revealInstance(state, slot) {
   const card = state.board[slot - 1]
-  if (!card || card.hasRevealed) return
+  if (!card || card.faceUp) return
   card.faceUp = true
-  card.hasRevealed = true
   const def = definition(card)
-  for (const dim of DIMENSIONS) {
-    if (card.stats[dim.id] === '?') card.stats[dim.id] = 1 + Math.floor(Math.random() * 6)
-  }
   addLog(state, `${slot}号位「${def.name}」显现。`, 'reveal')
-  applyRevealEffect(state, slot)
+  applyAuraJudgments(state)
+  if (canTriggerReveal(def, slot) && consumeRevealLimit(card, def)) {
+    applyRevealEffect(state, slot)
+  }
+  applyAuraResolutions(state)
 }
 
 function applyRevealEffect(state, slot) {
@@ -265,7 +404,6 @@ function applyRevealEffect(state, slot) {
   const def = definition(card)
   const player = card.owner
   const opponent = OTHER_PLAYER[player]
-  const stats = effectiveStats(card)
 
   switch (def.effect) {
     case 'antNest': {
@@ -300,7 +438,7 @@ function applyRevealEffect(state, slot) {
     case 'rain': {
       const drawn = drawOne(state, player)
       if (drawn) {
-        modifyStat(state, drawn, 'disqualification', 2, true)
+        modifyStat(state, drawn, 'disqualification', 2, 'temporary')
         addLog(state, `雨季令抽到的「${definition(drawn).name}」本回合失格＋2。`, 'effect')
       }
       break
@@ -308,7 +446,11 @@ function applyRevealEffect(state, slot) {
     case 'mirror': {
       const target = slot > 1 ? state.board[slot - 2] : null
       if (target?.faceUp) {
-        card.stats = effectiveStats(target)
+        const copiedStats = effectiveStats(target)
+        card.stats = Object.fromEntries(DIMENSIONS.map((dim) => [dim.id, copiedStats[dim.id]]))
+        card.permanentStats = {}
+        card.tempStats = {}
+        card.auraStats = {}
         addLog(state, `镜子复制了${slot - 1}号位的当前四维。`, 'effect')
       }
       break
@@ -316,7 +458,8 @@ function applyRevealEffect(state, slot) {
     case 'proliferate': {
       if (state.hands[player].length < HAND_LIMIT) {
         const copy = makeInstance('A66', player, true)
-        copy.stats = clone(stats)
+        copy.stats = clone(card.stats)
+        copy.permanentStats = clone(card.permanentStats)
         copy.keywords.push('放逐')
         state.hands[player].push(copy)
         addLog(state, '增殖生成了一张当前四维的复制。', 'effect')
@@ -325,15 +468,16 @@ function applyRevealEffect(state, slot) {
     }
     case 'faces': {
       const pool = ['barren', 'disqualification', 'calamity']
-      const chosen = pool[Math.floor(Math.random() * pool.length)]
+      const chosen = pool[Math.floor(drawRandom(state) * pool.length)]
       state.board.forEach((target, index) => {
         if (target && index > 0 && index !== slot - 1 && target.faceUp) {
           const targetStats = effectiveStats(target)
           target.stats.chaos = targetStats[chosen]
           target.stats[chosen] = targetStats.chaos
+          target.tempStats = {}
         }
       })
-      addLog(state, `千面交换里世界的混沌与${DIMENSIONS.find((d) => d.id === chosen).name}。`, 'effect')
+      addLog(state, `千面交换里世界的混沌与${DIMENSIONS.find((dim) => dim.id === chosen).name}。`, 'effect')
       break
     }
     case 'lighthouse': {
@@ -363,17 +507,13 @@ function beginReveal(state) {
   addLog(state, '所有世界已放置，开始依次显现。', 'important')
 }
 
-function advanceTurn(state) {
-  if (state.turn.index < 2) {
-    state.turn.index += 1
+function endCurrentPlay(state) {
+  if (state.turn.player === state.firstPlayer) {
+    ensureMainWorld(state)
+    state.turn = createTurn(OTHER_PLAYER[state.firstPlayer])
     return
   }
-  if (state.turn.player === state.firstPlayer) {
-    state.turn.player = OTHER_PLAYER[state.firstPlayer]
-    state.turn.index = 0
-  } else {
-    beginReveal(state)
-  }
+  beginReveal(state)
 }
 
 export function placeCard(source, uid) {
@@ -382,20 +522,25 @@ export function placeCard(source, uid) {
   const player = state.turn.player
   const slot = currentSlot(state)
   const handIndex = state.hands[player].findIndex((card) => card.uid === uid)
-  if (handIndex < 0 || !canPlay(state.hands[player][handIndex], slot, state.round)) return source
+  if (handIndex < 0 || !slot || !canPlay(state.hands[player][handIndex], slot, state.round)) return source
   const [card] = state.hands[player].splice(handIndex, 1)
-  card.faceUp = definition(card).keywords.includes('明牌') || (slot === 1 && !definition(card).keywords.includes('暗牌'))
+  card.faceUp = false
   state.board[slot - 1] = card
   addLog(state, `${player === 'user' ? '你' : '对手'}将一张牌放入${slot}号位。`)
-  if (card.faceUp) revealInstance(state, slot)
-  advanceTurn(state)
+  if (definition(card).keywords.includes('明牌') || (slot === 1 && !definition(card).keywords.includes('暗牌'))) {
+    revealInstance(state, slot)
+  }
+  if (!availableSlots(state, player).length) {
+    endCurrentPlay(state)
+  } else {
+    state.turn.activeSlot = null
+  }
   return state
 }
 
 function ensureMainWorld(state) {
   if (state.board[0]) return
   const card = makeInstance('O1000', 'system', true)
-  card.faceUp = true
   state.board[0] = card
   addLog(state, '系统将「存在」置入空缺的1号位。', 'important')
   revealInstance(state, 1)
@@ -405,9 +550,10 @@ export function skipSlot(source) {
   if (source.phase !== 'play') return source
   const state = clone(source)
   const slot = currentSlot(state)
+  if (!slot) return source
   addLog(state, `${state.turn.player === 'user' ? '你' : '对手'}跳过${slot}号位。`)
-  if (slot === 1 && state.turn.player === state.firstPlayer) ensureMainWorld(state)
-  advanceTurn(state)
+  if (!state.turn.skippedSlots.includes(slot)) state.turn.skippedSlots.push(slot)
+  state.turn.activeSlot = null
   return state
 }
 
@@ -415,38 +561,43 @@ export function stopTurn(source) {
   if (source.phase !== 'play') return source
   const state = clone(source)
   addLog(state, `${state.turn.player === 'user' ? '你' : '对手'}停止出牌。`)
-  if (state.turn.player === state.firstPlayer) {
-    ensureMainWorld(state)
-    state.turn.player = OTHER_PLAYER[state.firstPlayer]
-    state.turn.index = 0
-  } else {
-    beginReveal(state)
-  }
+  endCurrentPlay(state)
   return state
 }
 
-function mainStat(main, dim) {
-  if (!main) return 0
+function mainStat(main, dim, rng) {
+  if (!main?.faceUp) return 0
   if (definition(main).effect === 'emptySky') return 2
-  return effectiveStats(main)[dim]
+  return resolveStats(main, rng)[dim]
 }
 
-export function calculateScores(state) {
+export function calculateScores(state, rng = null) {
+  const randomSource = rng || (() => drawRandom(state))
   const main = state.board[0]
   const dims = main?.faceUp && definition(main).effect === 'emptySky'
     ? DIMENSIONS.map((dim) => dim.id)
     : state.dimensions
+  const cardStats = (card) => {
+    if (!card?.faceUp) return Object.fromEntries(DIMENSIONS.map((dim) => [dim.id, 0]))
+    return resolveStats(card, randomSource)
+  }
   let firstScore = 0
   let secondScore = 0
   for (const dim of dims) {
-    const multiplier = mainStat(main, dim)
-    const firstInner = [3, 5].reduce((sum, slot) => sum + (state.board[slot - 1] ? effectiveStats(state.board[slot - 1])[dim] : 0), 0)
-    const secondInner = [2, 4, 6].reduce((sum, slot) => sum + (state.board[slot - 1] ? effectiveStats(state.board[slot - 1])[dim] : 0), 0)
+    const multiplier = mainStat(main, dim, randomSource)
+    const firstInner = [3, 5].reduce((sum, slot) => {
+      const card = state.board[slot - 1]
+      return sum + (card ? cardStats(card)[dim] : 0)
+    }, 0)
+    const secondInner = [2, 4, 6].reduce((sum, slot) => {
+      const card = state.board[slot - 1]
+      return sum + (card ? cardStats(card)[dim] : 0)
+    }, 0)
     firstScore += multiplier * firstInner
     secondScore += multiplier * secondInner
   }
-  firstScore = Math.max(0, firstScore)
-  secondScore = Math.max(0, secondScore)
+  firstScore = Math.max(0, Math.floor(firstScore))
+  secondScore = Math.max(0, Math.floor(secondScore))
   return {
     dimensions: dims,
     firstScore,
@@ -468,29 +619,64 @@ export function revealStep(source) {
       return state
     }
   }
-  const result = calculateScores(state)
-  const winner = result.firstScore === result.secondScore ? 'tie' : result.firstScore > result.secondScore ? state.firstPlayer : OTHER_PLAYER[state.firstPlayer]
-  if (winner === 'tie') {
-    state.wins.user += 1
-    state.wins.ai += 1
-  } else {
-    state.wins[winner] += 1
-  }
-  state.roundResult = { ...result, winner }
-  state.phase = 'roundEnd'
-  addLog(state, `计分完成：你 ${result.userScore}／对手 ${result.aiScore}。`, 'important')
-  if ((state.wins.user >= 5) !== (state.wins.ai >= 5)) {
-    state.gameWinner = state.wins.user >= 5 ? 'user' : 'ai'
-    state.phase = 'gameOver'
-  }
+  state.pendingScoreBoard = clone(state.board)
+  state.phase = 'retain'
+  addLog(state, '显现完成，进入弃牌与保留。', 'important')
   return state
 }
 
-export function openRetention(source) {
-  if (source.phase !== 'roundEnd') return source
+function applyDiscardEffect(state, card) {
+  const def = definition(card)
+  if (def.trigger !== '弃置') return
+  switch (def.effect) {
+    case 'discardProbe':
+      addLog(state, `「${def.name}」触发［弃置］。`, 'effect')
+      break
+    default:
+      break
+  }
+}
+
+function discardCard(state, card, { triggerDiscard = false, clearTemp = true } = {}) {
+  const owner = card.owner
+  card.faceUp = false
+  if (clearTemp) {
+    card.tempStats = {}
+    card.tempExpiryRound = null
+  }
+  if (card.keywords.includes('放逐') || card.generated) {
+    state.exiles[owner].push(card)
+    return
+  }
+  if (state.discards[owner].length >= DISCARD_LIMIT) {
+    state.removedCards[owner].push(card)
+    addLog(state, `${owner === 'system' ? '系统' : owner === 'user' ? '你的' : '对手的'}1张牌因弃牌区已满而移出游戏。`, 'important')
+    return
+  }
+  state.discards[owner].push(card)
+  if (triggerDiscard) applyDiscardEffect(state, card)
+}
+
+export function discardHandCard(source, player, uid) {
   const state = clone(source)
-  state.phase = 'retain'
+  const index = state.hands[player].findIndex((card) => card.uid === uid)
+  if (index < 0) return source
+  const [card] = state.hands[player].splice(index, 1)
+  discardCard(state, card, { triggerDiscard: true })
   return state
+}
+
+function applyRetainEffect(state, card) {
+  const def = definition(card)
+  if (def.trigger !== '保留') return
+  switch (def.effect) {
+    case 'hive':
+      modifyStat(state, card, 'chaos', 1, 'permanent')
+      addLog(state, `${card.owner === 'user' ? '你的' : '对手的'}蜂巢因保留而混沌永久＋1。`, 'effect')
+      break
+    default:
+      break
+  }
 }
 
 export function chooseAiRetain(state) {
@@ -506,48 +692,103 @@ export function chooseAiRetain(state) {
   })[0].uid
 }
 
-function discardCard(state, card) {
-  const owner = card.owner
-  card.faceUp = false
-  card.hasRevealed = false
-  card.tempStats = {}
-  if (card.keywords.includes('放逐') || card.generated) state.exiles[owner].push(card)
-  else state.discards[owner].push(card)
-}
-
 function retainCard(state, player, uid) {
   const retained = state.hands[player].filter((card) => card.uid === uid)
   const discarded = state.hands[player].filter((card) => card.uid !== uid)
-  discarded.forEach((card) => discardCard(state, card))
+  discarded.forEach((card) => discardCard(state, card, { triggerDiscard: true }))
   state.hands[player] = retained
   if (retained[0]) {
-    retained[0].tempStats = {}
-    if (definition(retained[0]).effect === 'hive') {
-      modifyStat(state, retained[0], 'chaos', 1)
-      addLog(state, `${player === 'user' ? '你的' : '对手的'}蜂巢因保留而混沌＋1。`, 'effect')
+    retained[0].faceUp = false
+    applyRetainEffect(state, retained[0])
+    if (Object.keys(retained[0].tempStats).length && retained[0].tempExpiryRound == null) {
+      retained[0].tempExpiryRound = state.round + 1
     }
   }
+}
+
+function clearExpiredTemporaryStats(state) {
+  for (const player of ['user', 'ai']) {
+    for (const card of state.hands[player]) {
+      if (card.tempExpiryRound === state.round) {
+        card.tempStats = {}
+        card.tempExpiryRound = null
+      }
+    }
+  }
+}
+
+function applyGameEnd(state) {
+  const { user, ai } = state.wins
+  let winner = null
+  if (user >= 5 || ai >= 5) {
+    if (user !== ai) winner = user > ai ? 'user' : 'ai'
+  }
+  if (!winner && state.round >= MAX_ROUNDS) {
+    winner = user === ai ? 'draw' : (user > ai ? 'user' : 'ai')
+  }
+  if (winner) {
+    state.gameWinner = winner
+    state.phase = 'gameOver'
+    return
+  }
+  state.phase = 'roundEnd'
 }
 
 export function completeRound(source, userRetainUid = null) {
   if (source.phase !== 'retain') return source
   const state = clone(source)
-  state.board.forEach((card) => card && discardCard(state, card))
-  retainCard(state, 'user', userRetainUid)
-  retainCard(state, 'ai', chooseAiRetain(state))
-  state.round += 1
-  state.firstPlayer = state.round % 2 === 1 ? 'user' : 'ai'
+  state.pendingScoreBoard ||= clone(state.board)
+  const scoringState = { ...state, board: clone(state.pendingScoreBoard) }
+
+  state.board.forEach((card) => {
+    if (card) discardCard(state, card, { triggerDiscard: false })
+  })
   state.board = Array(6).fill(null)
-  state.dimensions = randomDimensions()
-  state.turn = { player: state.firstPlayer, index: 0 }
+
+  const players = [state.firstPlayer, OTHER_PLAYER[state.firstPlayer]]
+  const retainDecisions = {
+    user: userRetainUid,
+    ai: chooseAiRetain(state),
+  }
+  for (const player of players) {
+    retainCard(state, player, retainDecisions[player])
+  }
+
+  const result = calculateScores(scoringState, () => drawRandom(state))
+  const winner = result.firstScore === result.secondScore
+    ? 'tie'
+    : result.firstScore > result.secondScore ? state.firstPlayer : OTHER_PLAYER[state.firstPlayer]
+  if (winner === 'tie') {
+    state.wins.user += 1
+    state.wins.ai += 1
+  } else {
+    state.wins[winner] += 1
+  }
+  state.roundResult = { ...result, winner }
+  state.pendingScoreBoard = null
+  clearExpiredTemporaryStats(state)
+  addLog(state, `计分完成：你 ${result.userScore}／对手 ${result.aiScore}。`, 'important')
+  applyGameEnd(state)
+  return state
+}
+
+export function beginNextRound(source) {
+  if (source.phase !== 'roundEnd') return source
+  const state = clone(source)
+  state.round += 1
+  state.firstPlayer = OTHER_PLAYER[state.firstPlayer]
+  state.turn = createTurn(state.firstPlayer)
+  state.board = Array(6).fill(null)
+  state.dimensions = randomDimensions(() => drawRandom(state))
   state.phase = 'play'
   state.roundResult = null
   state.revealQueue = []
   state.revealIndex = 0
+  state.pendingScoreBoard = null
   drawToFive(state, 'user')
   drawToFive(state, 'ai')
   addLog(state, `第${state.round}回合开始，${state.firstPlayer === 'user' ? '你' : '对手'}先手。`, 'important')
-  addLog(state, `本回合维度：${state.dimensions.map((id) => DIMENSIONS.find((d) => d.id === id).name).join('、')}。`)
+  addLog(state, `本回合维度：${state.dimensions.map((id) => DIMENSIONS.find((dim) => dim.id === id).name).join('、')}。`)
   return state
 }
 
@@ -560,12 +801,12 @@ export function chooseAiCard(state) {
     const def = definition(card)
     const stats = effectiveStats(card)
     const dimScore = state.dimensions.reduce((sum, dim) => sum + stats[dim], 0)
-    let bonus = Math.random() * 0.8
+    let bonus = 0
     if (slot === 1) {
       const handPotential = state.hands.ai.reduce((sum, item) => {
         if (item.uid === card.uid) return sum
         const values = effectiveStats(item)
-        return sum + state.dimensions.reduce((n, dim) => n + values[dim], 0)
+        return sum + state.dimensions.reduce((total, dim) => total + values[dim], 0)
       }, 0)
       bonus += dimScore * Math.min(2, handPotential / 20)
       if (def.effect === 'emptySky') bonus += 8
@@ -584,6 +825,16 @@ export function chooseAiCard(state) {
 
 export function phaseName(state) {
   return {
-    play: '出牌阶段', reveal: '拼点阶段', roundEnd: '结算完成', retain: '弃牌与保留', gameOver: '校订结束',
+    play: '出牌阶段', reveal: '拼点阶段', retain: '弃牌与保留', roundEnd: '结算完成', gameOver: '校订结束',
   }[state.phase] || state.phase
+}
+
+export function sortCardsForDisplay(cards) {
+  return [...cards].sort((a, b) => {
+    const levelDifference = (zoneDisplayRank[definition(a).level] ?? 99) - (zoneDisplayRank[definition(b).level] ?? 99)
+    if (levelDifference) return levelDifference
+    const idComparison = String(definition(a).id).localeCompare(String(definition(b).id), 'zh-CN')
+    if (idComparison) return idComparison
+    return String(a.uid).localeCompare(String(b.uid))
+  })
 }

@@ -69,23 +69,23 @@ describe('卡组、随机与构筑', () => {
   })
 
   it('卡组大小、同名、等级与系统卡限制仍然生效', () => {
-    expect(validateDeckRecipe([['A1.1', 29]]).valid).toBe(false)
+    expect(validateDeckRecipe([['A11.1', 29]]).valid).toBe(false)
     expect(validateDeckRecipe(DEFAULT_RECIPE).valid).toBe(true)
-    expect(validateDeckRecipe([['A1.1', 41]]).valid).toBe(false)
-    expect(validateDeckRecipe([['A1.1', 4]]).errors).toContain('「列鼎」同名至多3张')
-    expect(validateDeckRecipe([['A1.3', 13]]).errors).toContain('灾祸级合计至多12张')
-    expect(validateDeckRecipe([['A1.4', 3], ['B1.4', 3], ['C1.4', 2]]).errors).toContain('崩坏级合计至多7张')
-    expect(validateDeckRecipe([['A1.5', 3], ['B1.5', 1]]).errors).toContain('终末级合计至多3张')
+    expect(validateDeckRecipe([['A11.1', 41]]).valid).toBe(false)
+    expect(validateDeckRecipe([['A11.1', 4]]).errors).toContain('「列鼎」同名至多3张')
+    expect(validateDeckRecipe([['A11.3', 13]]).errors).toContain('灾祸级合计至多12张')
+    expect(validateDeckRecipe([['A11.4', 3], ['B11.4', 3], ['C11.4', 2]]).errors).toContain('崩坏级合计至多7张')
+    expect(validateDeckRecipe([['A11.5', 3], ['B11.5', 1]]).errors).toContain('终末级合计至多3张')
     expect(validateDeckRecipe([['O1000', 30]]).valid).toBe(false)
   })
 
   it('隐秘级不再有独立携带上限', () => {
     expect(LEVEL_DECK_LIMITS['隐秘']).toBeUndefined()
     const recipe = [
-      ['Y2', 3],
-      ['A1.1', 3], ['A1.2', 3], ['B1.1', 3], ['B1.2', 3], ['C1.1', 3], ['C1.2', 3],
-      ['A1.3', 3], ['B1.3', 3], ['C1.3', 3],
-      ['A1.4', 1],
+      ['Y12', 3],
+      ['A11.1', 3], ['A11.2', 3], ['B11.1', 3], ['B11.2', 3], ['C11.1', 3], ['C11.2', 3],
+      ['A11.3', 3], ['B11.3', 3], ['C11.3', 3],
+      ['A11.4', 1],
     ]
     expect(validateDeckRecipe(recipe).valid).toBe(true)
   })
@@ -106,11 +106,11 @@ describe('卡组、随机与构筑', () => {
 
 describe('出牌、跳过与停止', () => {
   it('按回合开放等级，并限制中枢与边界位置', () => {
-    expect(canPlay(makeCard('A4'), 3, 3)).toBe(false)
-    expect(canPlay(makeCard('A4'), 3, 4)).toBe(true)
-    expect(canPlay(makeCard('C1'), 1, 6)).toBe(false)
-    expect(canPlay(makeCard('C1'), 1, 7)).toBe(true)
-    expect(canPlay(makeCard('C1'), 3, 7)).toBe(false)
+    expect(canPlay(makeCard('A14'), 3, 3)).toBe(false)
+    expect(canPlay(makeCard('A14'), 3, 4)).toBe(true)
+    expect(canPlay(makeCard('A11.5'), 1, 6)).toBe(false)
+    expect(canPlay(makeCard('A11.5'), 1, 7)).toBe(true)
+    expect(canPlay(makeCard('O11', { keywords: ['中枢'] }), 3, 7)).toBe(false)
     expect(canPlay(makeCard('Y96'), 1, 1)).toBe(false)
     expect(canPlay(makeCard('Y96'), 6, 4)).toBe(true)
   })
@@ -148,7 +148,7 @@ describe('出牌、跳过与停止', () => {
 
   it('放满自己的三个位置后自动交给对手', () => {
     let game = createGame({ seed: 'auto-handover', firstPlayer: 'user' })
-    game.hands.user = [makeCard('A1.1'), makeCard('A1.2'), makeCard('B1.1')]
+    game.hands.user = [makeCard('A11.1'), makeCard('A11.2'), makeCard('B11.1')]
     game = placeCard(game, game.hands.user[0].uid)
     game = placeCard(game, game.hands.user[0].uid)
     game = placeCard(game, game.hands.user[0].uid)
@@ -162,12 +162,12 @@ describe('四维、修正与结算随机', () => {
     const game = createGame({ seed: 'score', firstPlayer: 'user' })
     game.dimensions = ['chaos', 'barren']
     game.board = Array(6).fill(null)
-    game.board[0] = makeCard('O1', { faceUp: true })
-    game.board[2] = makeCard('O1', { faceUp: true, stats: { chaos: 3, barren: 1, disqualification: 0, calamity: 0 } })
-    game.board[4] = makeCard('O1', { faceUp: true, stats: { chaos: 1, barren: 2, disqualification: 0, calamity: 0 } })
-    game.board[1] = makeCard('O1', { faceUp: true, stats: { chaos: 2, barren: 1, disqualification: 0, calamity: 0 } })
-    game.board[3] = makeCard('O1', { faceUp: true, stats: { chaos: 2, barren: 1, disqualification: 0, calamity: 0 } })
-    game.board[5] = makeCard('O1', { faceUp: true, stats: { chaos: 2, barren: 1, disqualification: 0, calamity: 0 } })
+    game.board[0] = makeCard('O11', { faceUp: true })
+    game.board[2] = makeCard('O11', { faceUp: true, stats: { chaos: 3, barren: 1, disqualification: 0, calamity: 0 } })
+    game.board[4] = makeCard('O11', { faceUp: true, stats: { chaos: 1, barren: 2, disqualification: 0, calamity: 0 } })
+    game.board[1] = makeCard('O11', { faceUp: true, stats: { chaos: 2, barren: 1, disqualification: 0, calamity: 0 } })
+    game.board[3] = makeCard('O11', { faceUp: true, stats: { chaos: 2, barren: 1, disqualification: 0, calamity: 0 } })
+    game.board[5] = makeCard('O11', { faceUp: true, stats: { chaos: 2, barren: 1, disqualification: 0, calamity: 0 } })
     const result = calculateScores(game, () => 0.5)
     expect(result.firstScore).toBe(14)
     expect(result.secondScore).toBe(18)
@@ -178,9 +178,9 @@ describe('四维、修正与结算随机', () => {
     const game = createGame({ seed: 'overflow', firstPlayer: 'user' })
     game.dimensions = ['chaos']
     game.board = Array(6).fill(null)
-    const main = makeCard('O1', { faceUp: true, stats: { chaos: 6, barren: 0, disqualification: 0, calamity: 0 }, tempStats: { chaos: 5 } })
+    const main = makeCard('O11', { faceUp: true, stats: { chaos: 6, barren: 0, disqualification: 0, calamity: 0 }, tempStats: { chaos: 5 } })
     game.board[0] = main
-    game.board[2] = makeCard('O1', { faceUp: true, stats: { chaos: 3, barren: 0, disqualification: 0, calamity: 0 } })
+    game.board[2] = makeCard('O11', { faceUp: true, stats: { chaos: 3, barren: 0, disqualification: 0, calamity: 0 } })
     expect(effectiveStats(main).chaos).toBe(11)
     expect(calculateScores(game, () => 0).firstScore).toBe(33)
     main.tempStats.chaos = -20
@@ -194,8 +194,8 @@ describe('四维、修正与结算随机', () => {
     const game = createGame({ seed: 'question', firstPlayer: 'user' })
     game.dimensions = ['chaos']
     game.board = Array(6).fill(null)
-    game.board[0] = makeCard('O1', { faceUp: true, stats: { chaos: '?', barren: 0, disqualification: 0, calamity: 0 } })
-    game.board[2] = makeCard('O1', { faceUp: true, stats: { chaos: 3, barren: 0, disqualification: 0, calamity: 0 } })
+    game.board[0] = makeCard('O11', { faceUp: true, stats: { chaos: '?', barren: 0, disqualification: 0, calamity: 0 } })
+    game.board[2] = makeCard('O11', { faceUp: true, stats: { chaos: 3, barren: 0, disqualification: 0, calamity: 0 } })
     expect(calculateScores(game, () => 0).firstScore).toBe(3)
     expect(calculateScores(game, () => 0.999).firstScore).toBe(18)
     expect(game.board[0].stats.chaos).toBe('?')
@@ -205,23 +205,23 @@ describe('四维、修正与结算随机', () => {
     const game = createGame({ seed: 'question-mods', firstPlayer: 'user' })
     game.dimensions = ['chaos']
     game.board = Array(6).fill(null)
-    game.board[0] = makeCard('O1', {
+    game.board[0] = makeCard('O11', {
       faceUp: true,
       stats: { chaos: '?', barren: 0, disqualification: 0, calamity: 0 },
       tempStats: { chaos: -100 },
       auraStats: { chaos: 2 },
     })
-    game.board[2] = makeCard('O1', { faceUp: true, stats: { chaos: 3, barren: 0, disqualification: 0, calamity: 0 } })
+    game.board[2] = makeCard('O11', { faceUp: true, stats: { chaos: 3, barren: 0, disqualification: 0, calamity: 0 } })
     expect(calculateScores(game, () => 0).firstScore).toBe(9)
   })
 })
 
 describe('显现触发模型', () => {
   it('每次由暗转明都会重复触发显现', () => {
-    patchCard('O1', { trigger: '显现', triggerVariant: null, triggerLimit: undefined, effect: 'antNest' })
+    patchCard('O11', { trigger: '显现', triggerVariant: null, triggerLimit: undefined, effect: 'antNest' })
     let game = createGame({ seed: 'repeat-reveal', firstPlayer: 'user' })
-    game.board[0] = makeCard('O1', { faceUp: true })
-    game.board[1] = makeCard('O1', { owner: 'ai' })
+    game.board[0] = makeCard('O11', { faceUp: true })
+    game.board[1] = makeCard('O11', { owner: 'ai' })
     game.phase = 'reveal'
     game.revealQueue = [2]
     game.revealIndex = 0
@@ -235,10 +235,10 @@ describe('显现触发模型', () => {
   })
 
   it('显现限制n按卡牌实例递减，到0后不再触发', () => {
-    patchCard('O1', { trigger: '显现', triggerVariant: null, triggerLimit: 2, effect: 'antNest' })
+    patchCard('O11', { trigger: '显现', triggerVariant: null, triggerLimit: 2, effect: 'antNest' })
     let game = createGame({ seed: 'limited-reveal', firstPlayer: 'user' })
-    game.board[0] = makeCard('O1', { faceUp: true })
-    game.board[1] = makeCard('O1', { owner: 'ai' })
+    game.board[0] = makeCard('O11', { faceUp: true })
+    game.board[1] = makeCard('O11', { owner: 'ai' })
     game.phase = 'reveal'
     game.revealQueue = [2]
     game.revealIndex = 0
@@ -262,8 +262,8 @@ describe('显现触发模型', () => {
   it('镜子复制相邻前位当前四维', () => {
     let game = createGame({ seed: 'mirror', firstPlayer: 'user' })
     game.board = Array(6).fill(null)
-    game.board[0] = makeCard('O1', { faceUp: true, stats: { chaos: 5, barren: 4, disqualification: 3, calamity: 2 } })
-    game.board[1] = makeCard('Y2')
+    game.board[0] = makeCard('O11', { faceUp: true, stats: { chaos: 5, barren: 4, disqualification: 3, calamity: 2 } })
+    game.board[1] = makeCard('Y12')
     game.phase = 'reveal'
     game.revealQueue = [2]
     game.revealIndex = 0
@@ -277,7 +277,7 @@ describe('显现触发模型', () => {
     let game = createGame({ seed: 'bloom-limit', firstPlayer: 'user' })
     game.board = Array(6).fill(null)
     game.board[1] = makeCard('C31', { owner: 'ai' })
-    game.hands.user = Array.from({ length: 8 }, (_, index) => makeCard('O1', { uid: `full-${index}` }))
+    game.hands.user = Array.from({ length: 8 }, (_, index) => makeCard('O11', { uid: `full-${index}` }))
     game.phase = 'reveal'
     game.revealQueue = [2]
     game.revealIndex = 0
@@ -289,7 +289,7 @@ describe('显现触发模型', () => {
 describe('回合流程、保留与胜负', () => {
   it('拼点完成后先进入弃牌与保留，保留完成后才结算', () => {
     let game = createGame({ seed: 'phase-order', firstPlayer: 'user' })
-    game.board[0] = makeCard('O1', { faceUp: true })
+    game.board[0] = makeCard('O11', { faceUp: true })
     game.phase = 'reveal'
     game.revealQueue = []
     game.revealIndex = 0
@@ -323,7 +323,7 @@ describe('回合流程、保留与胜负', () => {
   it('蜂巢保留后混沌永久加一', () => {
     let game = createGame({ seed: 'hive', firstPlayer: 'user' })
     game.phase = 'retain'
-    const hive = makeCard('B9')
+    const hive = makeCard('B19')
     game.hands.user = [hive]
     game.hands.ai = []
     game.board = Array(6).fill(null)
@@ -336,7 +336,7 @@ describe('回合流程、保留与胜负', () => {
   it('被保留牌的非永久修正会在下1个回合结束时清除', () => {
     let game = createGame({ seed: 'retain-temp', firstPlayer: 'user' })
     game.phase = 'retain'
-    const retained = makeCard('O1', { tempStats: { chaos: 5 } })
+    const retained = makeCard('O11', { tempStats: { chaos: 5 } })
     const uid = retained.uid
     game.hands.user = [retained]
     game.hands.ai = []
@@ -359,8 +359,8 @@ describe('回合流程、保留与胜负', () => {
     game.wins = { user: 5, ai: 5 }
     game.dimensions = ['chaos']
     game.board = Array(6).fill(null)
-    game.board[0] = makeCard('O1', { faceUp: true, stats: { chaos: 2, barren: 0, disqualification: 0, calamity: 0 } })
-    game.board[2] = makeCard('O1', { faceUp: true, stats: { chaos: 3, barren: 0, disqualification: 0, calamity: 0 } })
+    game.board[0] = makeCard('O11', { faceUp: true, stats: { chaos: 2, barren: 0, disqualification: 0, calamity: 0 } })
+    game.board[2] = makeCard('O11', { faceUp: true, stats: { chaos: 3, barren: 0, disqualification: 0, calamity: 0 } })
     game.phase = 'retain'
     game.hands.user = []
     game.hands.ai = []
@@ -385,10 +385,10 @@ describe('回合流程、保留与胜负', () => {
 
 describe('弃置、区域上限与展示顺序', () => {
   it('手牌进入弃牌区时触发弃置', () => {
-    patchCard('O1', { trigger: '弃置', effect: 'discardProbe' })
+    patchCard('O11', { trigger: '弃置', effect: 'discardProbe' })
     let game = createGame({ seed: 'discard-trigger', firstPlayer: 'user' })
     game.phase = 'retain'
-    game.hands.user = [makeCard('O1')]
+    game.hands.user = [makeCard('O11')]
     game.hands.ai = []
     game.board = Array(6).fill(null)
     const next = completeRound(game, null)
@@ -396,10 +396,10 @@ describe('弃置、区域上限与展示顺序', () => {
   })
 
   it('放逐卡牌被弃置时不触发弃置', () => {
-    patchCard('O1', { trigger: '弃置', effect: 'discardProbe' })
+    patchCard('O11', { trigger: '弃置', effect: 'discardProbe' })
     let game = createGame({ seed: 'exile-discard', firstPlayer: 'user' })
     game.phase = 'retain'
-    game.hands.user = [makeCard('O1', { keywords: ['放逐'] })]
+    game.hands.user = [makeCard('O11', { keywords: ['放逐'] })]
     game.hands.ai = []
     game.board = Array(6).fill(null)
     const next = completeRound(game, null)
@@ -408,11 +408,11 @@ describe('弃置、区域上限与展示顺序', () => {
   })
 
   it('弃牌区满60后溢出的牌移出游戏且不触发弃置', () => {
-    patchCard('O1', { trigger: '弃置', effect: 'discardProbe' })
+    patchCard('O11', { trigger: '弃置', effect: 'discardProbe' })
     let game = createGame({ seed: 'discard-overflow', firstPlayer: 'user' })
     game.phase = 'retain'
-    game.discards.user = Array.from({ length: DISCARD_LIMIT }, (_, index) => makeCard('O1', { uid: `discard-${index}` }))
-    game.hands.user = [makeCard('O1')]
+    game.discards.user = Array.from({ length: DISCARD_LIMIT }, (_, index) => makeCard('O11', { uid: `discard-${index}` }))
+    game.hands.user = [makeCard('O11')]
     game.hands.ai = []
     game.board = Array(6).fill(null)
     const next = completeRound(game, null)
@@ -423,19 +423,19 @@ describe('弃置、区域上限与展示顺序', () => {
 
   it('牌库达到60后不能再生成或加入卡牌', () => {
     const game = createGame({ seed: 'deck-limit', firstPlayer: 'user' })
-    game.decks.user = Array.from({ length: 60 }, (_, index) => makeCard('O1', { uid: `deck-${index}` }))
-    expect(addCardToDeck(game, 'user', makeCard('O1'))).toBe(false)
+    game.decks.user = Array.from({ length: 60 }, (_, index) => makeCard('O11', { uid: `deck-${index}` }))
+    expect(addCardToDeck(game, 'user', makeCard('O11'))).toBe(false)
     expect(game.decks.user).toHaveLength(60)
   })
 
   it('牌库与弃牌区按固定等级顺序展示，不显示真实顺序', () => {
     const cards = [
-      makeCard('A1.1', { uid: 'pure' }),
-      makeCard('A1.2', { uid: 'sprout' }),
-      makeCard('A1.3', { uid: 'calamity' }),
-      makeCard('A1.4', { uid: 'collapse' }),
-      makeCard('A1.5', { uid: 'final' }),
-      makeCard('Y2', { uid: 'hidden' }),
+      makeCard('A11.1', { uid: 'pure' }),
+      makeCard('A11.2', { uid: 'sprout' }),
+      makeCard('A11.3', { uid: 'calamity' }),
+      makeCard('A11.4', { uid: 'collapse' }),
+      makeCard('A11.5', { uid: 'final' }),
+      makeCard('Y12', { uid: 'hidden' }),
     ]
     expect(sortCardsForDisplay(cards).map((card) => card.uid)).toEqual([
       'final', 'collapse', 'calamity', 'sprout', 'pure', 'hidden',

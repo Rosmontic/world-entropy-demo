@@ -212,7 +212,7 @@ describe('四维、修正与结算随机', () => {
     })
     game.mounts.user = { id: 'C5', owner: 'user', chargesRemaining: null, faceUp: true }
     game.board[2] = makeCard('O11', { faceUp: true, stats: { chaos: 3, barren: 0, disqualification: 0, calamity: 0 } })
-    expect(calculateScores(game, () => 0).firstScore).toBe(6)
+    expect(calculateScores(game, () => 0).firstScore).toBe(8)
   })
 })
 

@@ -179,6 +179,8 @@ function makeSignatureInstance(id, owner) {
     uid: `${owner}-signature-${uidCounter}`,
     id: def.id,
     owner,
+    trigger: def.trigger,
+    effect: def.effect,
     chargesRemaining: def.charges ?? null,
     faceUp: false,
   }
@@ -339,7 +341,10 @@ function applySignatureAura(state) {
   for (const card of state.board) {
     if (card) card.auraStats = {}
   }
-  const floodActive = ['user', 'ai'].some((player) => activeSignature(state, player)?.effect === 'floodAura')
+  const floodActive = ['user', 'ai'].some((player) => {
+    const signature = activeSignature(state, player)
+    return signature && SIGNATURE_MAP[signature.id]?.effect === 'floodAura'
+  })
   if (!floodActive) return
   for (const card of state.board) {
     if (!card) continue

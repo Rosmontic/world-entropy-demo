@@ -1,4 +1,5 @@
 import database from '../data/cards.json'
+import signatureDatabase from '../data/signatures.json'
 
 export const DIMENSIONS = [
   { id: 'chaos', name: '混沌', short: '混', color: '#b9a0dc' },
@@ -9,6 +10,10 @@ export const DIMENSIONS = [
 
 export const CARD_LIST = database.cards
 export const CARD_MAP = Object.fromEntries(CARD_LIST.map((card) => [card.id, card]))
+export const SIGNATURE_LIST = signatureDatabase.signatures
+export const SIGNATURE_MAP = Object.fromEntries(SIGNATURE_LIST.map((signature) => [signature.id, signature]))
+export const DEFAULT_SIGNATURE_ID = '0'
+export const MAX_SIGNATURE_LOADOUT = 3
 export const OTHER_PLAYER = { user: 'ai', ai: 'user' }
 export const HAND_LIMIT = 8
 export const DECK_LIMIT = 60
@@ -23,9 +28,9 @@ export const PLAYABLE_CARD_LIST = CARD_LIST.filter((card) => card.id !== 'O1000'
 export const ZONE_DISPLAY_ORDER = ['终末', '崩坏', '灾祸', '萌芽', '纯净', '隐秘']
 
 export const DEFAULT_RECIPE = [
-  ['A1.1', 3], ['A1.2', 3], ['A1.3', 3], ['A1.4', 2], ['A1.5', 1],
-  ['B1.1', 2], ['B1.2', 1], ['B1.3', 3], ['B1.4', 3], ['B1.5', 1],
-  ['C1.1', 1], ['C1.2', 1], ['C1.3', 3], ['C1.4', 2], ['C1.5', 1],
+  ['A11.1', 3], ['A11.2', 3], ['A11.3', 3], ['A11.4', 2], ['A11.5', 1],
+  ['B11.1', 2], ['B11.2', 1], ['B11.3', 3], ['B11.4', 3], ['B11.5', 1],
+  ['C11.1', 1], ['C11.2', 1], ['C11.3', 3], ['C11.4', 2], ['C11.5', 1],
 ]
 
 const BASE_STAT_MINIMUM = 0
@@ -156,6 +161,58 @@ export function randomDimensions(rng = Math.random) {
   return shuffle(DIMENSIONS.map((dim) => dim.id), rng).slice(0, 2)
 }
 
+export function validateSignatureLoadout(ids) {
+  const errors = []
+  const list = Array.isArray(ids) ? ids.filter(Boolean) : []
+  if (list.length > MAX_SIGNATURE_LOADOUT) errors.push(`署名至多携带${MAX_SIGNATURE_LOADOUT}张`)
+  if (new Set(list).size !== list.length) errors.push('署名不可重复携带')
+  for (const id of list) {
+    if (!SIGNATURE_MAP[id]) errors.push(`未知署名：${id}`)
+  }
+  return { valid: errors.length === 0, errors: [...new Set(errors)] }
+}
+
+function makeSignatureInstance(id, owner) {
+  const def = SIGNATURE_MAP[id] || SIGNATURE_MAP[DEFAULT_SIGNATURE_ID]
+  uidCounter += 1
+  return {
+    uid: `${owner}-signature-${uidCounter}`,
+    id: def.id,
+    owner,
+    chargesRemaining: def.charges ?? null,
+    faceUp: false,
+  }
+}
+
+export function signatureLabel(signature) {
+  const def = SIGNATURE_MAP[signature?.id || signature]
+  return def ? `${def.id}-${def.name}` : '0-序言'
+}
+
+export function signatureText(signature) {
+  const def = SIGNATURE_MAP[signature?.id || signature]
+  if (!def) return SIGNATURE_MAP[DEFAULT_SIGNATURE_ID].text
+  if (def.charges == null || signature?.chargesRemaining == null) return def.text
+  return def.text.replace(/巡礼\d+/, `巡礼${signature.chargesRemaining}`)
+}
+
+function randomSignatureChoices(state, count = 3) {
+  const pool = SIGNATURE_LIST.filter((signature) => signature.id !== DEFAULT_SIGNATURE_ID)
+  return shuffle(pool, () => drawRandom(state)).slice(0, count).map((signature) => signature.id)
+}
+
+function chooseAiSignatureId(state) {
+  const loadout = state.signatureLoadouts?.ai || []
+  const pool = loadout.length
+    ? loadout.filter((id) => SIGNATURE_MAP[id])
+    : SIGNATURE_LIST.filter((signature) => signature.id !== DEFAULT_SIGNATURE_ID).map((signature) => signature.id)
+  if (!pool.length) return DEFAULT_SIGNATURE_ID
+  const deckSeries = new Set(state.decks.ai.map((card) => definition(card).series))
+  const matching = pool.filter((id) => deckSeries.has(SIGNATURE_MAP[id].series))
+  const candidates = matching.length ? matching : pool
+  return candidates[Math.floor(drawRandom(state) * candidates.length)]
+}
+
 export function normalizeDeckRecipe(recipe) {
   if (!Array.isArray(recipe)) return []
   return recipe
@@ -273,22 +330,180 @@ export function drawToFive(state, player) {
   }
 }
 
+function activeSignature(state, player) {
+  const signature = state.mounts?.[player]
+  return signature?.faceUp ? signature : null
+}
+
+function applySignatureAura(state) {
+  for (const card of state.board) {
+    if (card) card.auraStats = {}
+  }
+  const floodActive = ['user', 'ai'].some((player) => activeSignature(state, player)?.effect === 'floodAura')
+  if (!floodActive) return
+  for (const card of state.board) {
+    if (!card) continue
+    card.auraStats.chaos = (card.auraStats.chaos || 0) + 1
+    card.auraStats.disqualification = (card.auraStats.disqualification || 0) + 1
+  }
+}
+
+function applySignatureMount(state, player, signature) {
+  if (signature.effect !== 'presentWorld') return
+  for (const owner of ['user', 'ai']) {
+    for (const card of state.decks[owner]) {
+      const def = definition(card)
+      if (def.level === '纯净' || def.level === '萌芽') {
+        for (const dim of DIMENSIONS) modifyStat(state, card, dim.id, 1, 'permanent')
+      }
+    }
+  }
+  addLog(state, `${player === 'user' ? '你的' : '对手的'}「现世」令双方牌库中的纯净、萌芽卡四维永久＋1。`, 'effect')
+}
+
+function mountSignature(state, player, signatureId, { faceUp = true, trigger = true } = {}) {
+  const previous = state.mounts[player]
+  if (previous) state.removedCards[player].push(previous)
+  const signature = makeSignatureInstance(signatureId, player)
+  signature.faceUp = faceUp
+  state.mounts[player] = signature
+  addLog(state, `${player === 'user' ? '你的' : '对手的'}署名「${signatureLabel(signature)}」${faceUp ? '公开并挂载' : '以暗牌状态挂载'}。`, 'important')
+  if (faceUp && trigger && SIGNATURE_MAP[signature.id].trigger === '挂载') {
+    applySignatureMount(state, player, signature)
+  }
+  applySignatureAura(state)
+  return signature
+}
+
+export function selectSignature(source, signatureId) {
+  if (source.phase !== 'signature') return source
+  const choices = source.signatureLoadouts.user.length ? source.signatureLoadouts.user : source.signatureOptions.user
+  if (signatureId && !choices.includes(signatureId)) return source
+  const state = clone(source)
+  state.signatureSelections.user = signatureId || DEFAULT_SIGNATURE_ID
+  addLog(state, '你已完成署名选择，等待双方公开。')
+  return state
+}
+
+export function confirmSignatures(source) {
+  if (source.phase !== 'signature') return source
+  const state = clone(source)
+  const userId = state.signatureSelections.user || DEFAULT_SIGNATURE_ID
+  const aiId = chooseAiSignatureId(state)
+  state.signatureSelections.ai = aiId
+  const players = [state.firstPlayer, OTHER_PLAYER[state.firstPlayer]]
+  for (const player of players) {
+    mountSignature(state, player, player === 'user' ? userId : aiId)
+  }
+  state.phase = 'play'
+  drawToFive(state, 'user')
+  drawToFive(state, 'ai')
+  addLog(state, '署名挂载完成，第一次校订开始。', 'important')
+  addLog(state, `本回合维度：${state.dimensions.map((id) => DIMENSIONS.find((dim) => dim.id === id).name).join('、')}。`)
+  return state
+}
+
+export function replaceSignature(source, player, signatureId, { faceUp = true } = {}) {
+  if (!SIGNATURE_MAP[signatureId] || !statePlayerValid(player)) return source
+  const state = clone(source)
+  const oldLabel = state.mounts[player] ? signatureLabel(state.mounts[player]) : null
+  mountSignature(state, player, signatureId, { faceUp, trigger: true })
+  addLog(state, `${player === 'user' ? '你的' : '对手的'}署名「${oldLabel}」被替换为「${signatureLabel(signatureId)}」。`, 'important')
+  return state
+}
+
+function statePlayerValid(player) {
+  return player === 'user' || player === 'ai'
+}
+
+function performPilgrimage(state, player, choice, targetUid = null) {
+  const signature = activeSignature(state, player)
+  const def = signature ? SIGNATURE_MAP[signature.id] : null
+  if (!def || def.effect !== 'cosmicPilgrimage' || signature.chargesRemaining <= 0 || state.pilgrimageUsed[player]) return state
+  signature.chargesRemaining -= 1
+  state.pilgrimageUsed[player] = true
+  const ownerText = player === 'user' ? '你' : '对手'
+  if (choice === 1) {
+    if (state.hands[player].length >= HAND_LIMIT) {
+      addLog(state, `${ownerText}发动「寰宇」，但手牌已满，无法抽取。`, 'effect')
+      return state
+    }
+    const index = state.decks[player].findIndex((card) => definition(card).trigger === '保留')
+    if (index < 0) {
+      addLog(state, `${ownerText}发动「寰宇」，牌库中没有具有[保留]的牌。`, 'effect')
+      return state
+    }
+    const [card] = state.decks[player].splice(index, 1)
+    state.hands[player].push(card)
+    addLog(state, `${ownerText}发动「寰宇」，抽取了1张具有[保留]的牌。`, 'effect')
+    return state
+  }
+  const target = state.hands[player].find((card) => card.uid === targetUid && definition(card).trigger === '保留')
+  if (!target) {
+    addLog(state, `${ownerText}发动「寰宇」，但没有合法的手牌目标。`, 'effect')
+    return state
+  }
+  applyRetainEffect(state, target)
+  addLog(state, `${ownerText}发动「寰宇」，额外触发了「${definition(target).name}」的[保留]。`, 'effect')
+  return state
+}
+
+export function usePilgrimage(source, choice, targetUid = null) {
+  if (source.phase !== 'play' || source.turn.player !== 'user') return source
+  const state = clone(source)
+  performPilgrimage(state, 'user', choice, targetUid)
+  applySignatureAura(state)
+  return state
+}
+
+export function chooseAiPilgrimage(state) {
+  const signature = activeSignature(state, 'ai')
+  const def = signature ? SIGNATURE_MAP[signature.id] : null
+  if (state.phase !== 'play' || state.turn.player !== 'ai' || !def || def.effect !== 'cosmicPilgrimage') return null
+  if (signature.chargesRemaining <= 0 || state.pilgrimageUsed.ai) return null
+  const retainInHand = state.hands.ai.filter((card) => definition(card).trigger === '保留')
+  const canDraw = state.hands.ai.length < HAND_LIMIT && state.decks.ai.some((card) => definition(card).trigger === '保留')
+  if (!retainInHand.length && !canDraw) return null
+  if (canDraw && (!retainInHand.length || drawRandom(state) < 0.5)) return { choice: 1, targetUid: null }
+  return { choice: 2, targetUid: retainInHand[Math.floor(drawRandom(state) * retainInHand.length)].uid }
+}
+
+export function useAiPilgrimage(source) {
+  if (source.phase !== 'play' || source.turn.player !== 'ai') return source
+  const state = clone(source)
+  const action = chooseAiPilgrimage(state)
+  if (!action) return source
+  performPilgrimage(state, 'ai', action.choice, action.targetUid)
+  applySignatureAura(state)
+  return state
+}
+
 function createTurn(player) {
   return { player, activeSlot: null, skippedSlots: [] }
 }
 
-export function createGame({ userRecipe, aiRecipe, seed = randomSeed(), firstPlayer = null } = {}) {
+export function createGame({
+  userRecipe,
+  aiRecipe,
+  seed = randomSeed(),
+  firstPlayer = null,
+  userSignatures = [],
+  aiSignatures = [],
+  signaturePhase = false,
+} = {}) {
   const rng = createSeededRandom(seed)
   const chosenFirstPlayer = ['user', 'ai'].includes(firstPlayer)
     ? firstPlayer
     : (rng.next() < 0.5 ? 'user' : 'ai')
+  const userLoadout = validateSignatureLoadout(userSignatures).valid ? [...userSignatures] : []
+  const aiLoadout = validateSignatureLoadout(aiSignatures).valid ? [...aiSignatures] : []
   const state = {
     seed,
     rngState: rng.currentState(),
     round: 1,
     wins: { user: 0, ai: 0 },
     firstPlayer: chosenFirstPlayer,
-    phase: 'play',
+    phase: signaturePhase ? 'signature' : 'play',
     dimensions: randomDimensions(rng.next),
     turn: createTurn(chosenFirstPlayer),
     board: Array(6).fill(null),
@@ -300,6 +515,11 @@ export function createGame({ userRecipe, aiRecipe, seed = randomSeed(), firstPla
     discards: { user: [], ai: [] },
     exiles: { user: [], ai: [], system: [] },
     removedCards: { user: [], ai: [], system: [] },
+    signatureLoadouts: { user: userLoadout, ai: aiLoadout },
+    signatureOptions: { user: [], ai: [] },
+    signatureSelections: { user: null, ai: null },
+    mounts: { user: null, ai: null },
+    pilgrimageUsed: { user: false, ai: false },
     logs: [],
     revealQueue: [],
     revealIndex: 0,
@@ -307,6 +527,15 @@ export function createGame({ userRecipe, aiRecipe, seed = randomSeed(), firstPla
     roundResult: null,
     gameWinner: null,
   }
+  addLog(state, `第1回合由${chosenFirstPlayer === 'user' ? '你' : '对手'}先手。`, 'important')
+  if (signaturePhase) {
+    state.signatureOptions.user = userLoadout.length ? [] : randomSignatureChoices(state, 3)
+    state.signatureOptions.ai = aiLoadout.length ? [] : randomSignatureChoices(state, 3)
+    addLog(state, '双方正在秘密选择署名。')
+    return state
+  }
+  mountSignature(state, 'user', DEFAULT_SIGNATURE_ID, { faceUp: true, trigger: false })
+  mountSignature(state, 'ai', DEFAULT_SIGNATURE_ID, { faceUp: true, trigger: false })
   drawToFive(state, 'user')
   drawToFive(state, 'ai')
   addLog(state, '第一次校订开始。', 'important')
@@ -346,15 +575,7 @@ export function canPlay(card, slot, round) {
   return true
 }
 
-function activeMainEffect(state) {
-  const main = state.board[0]
-  return main?.faceUp ? definition(main).effect : null
-}
-
 function modifyStat(state, card, dim, amount, duration = 'temporary') {
-  const def = definition(card)
-  if (def.effect === 'emptySky') return
-  if (activeMainEffect(state) === 'silentPact' && amount > 0) return
   if (duration === 'permanent') {
     card.permanentStats[dim] = (card.permanentStats[dim] || 0) + amount
     return
@@ -378,7 +599,7 @@ function consumeRevealLimit(card, def) {
 }
 
 function applyAuraJudgments(state) {
-  return activeMainEffect(state)
+  return state.board.some((card) => card?.faceUp && definition(card).trigger === '主导')
 }
 
 function applyAuraResolutions(state) {
@@ -396,6 +617,7 @@ function revealInstance(state, slot) {
     applyRevealEffect(state, slot)
   }
   applyAuraResolutions(state)
+  applySignatureAura(state)
 }
 
 function applyRevealEffect(state, slot) {
@@ -530,6 +752,7 @@ export function placeCard(source, uid) {
   if (definition(card).keywords.includes('明牌') || (slot === 1 && !definition(card).keywords.includes('暗牌'))) {
     revealInstance(state, slot)
   }
+  applySignatureAura(state)
   if (!availableSlots(state, player).length) {
     endCurrentPlay(state)
   } else {
@@ -567,34 +790,41 @@ export function stopTurn(source) {
 
 function mainStat(main, dim, rng) {
   if (!main?.faceUp) return 0
-  if (definition(main).effect === 'emptySky') return 2
   return resolveStats(main, rng)[dim]
 }
 
 export function calculateScores(state, rng = null) {
   const randomSource = rng || (() => drawRandom(state))
-  const main = state.board[0]
-  const dims = main?.faceUp && definition(main).effect === 'emptySky'
-    ? DIMENSIONS.map((dim) => dim.id)
-    : state.dimensions
+  const scoringState = { ...state, board: clone(state.board) }
+  applySignatureAura(scoringState)
+  const main = scoringState.board[0]
+  const dims = state.dimensions
   const cardStats = (card) => {
     if (!card?.faceUp) return Object.fromEntries(DIMENSIONS.map((dim) => [dim.id, 0]))
     return resolveStats(card, randomSource)
   }
+  const slotValue = (slot, dim) => {
+    const card = scoringState.board[slot - 1]
+    return card ? cardStats(card)[dim] : 0
+  }
+  const firstEquations = []
+  const secondEquations = []
   let firstScore = 0
   let secondScore = 0
   for (const dim of dims) {
+    const dimName = DIMENSIONS.find((item) => item.id === dim).name
     const multiplier = mainStat(main, dim, randomSource)
-    const firstInner = [3, 5].reduce((sum, slot) => {
-      const card = state.board[slot - 1]
-      return sum + (card ? cardStats(card)[dim] : 0)
-    }, 0)
-    const secondInner = [2, 4, 6].reduce((sum, slot) => {
-      const card = state.board[slot - 1]
-      return sum + (card ? cardStats(card)[dim] : 0)
-    }, 0)
-    firstScore += multiplier * firstInner
-    secondScore += multiplier * secondInner
+    const firstThree = slotValue(3, dim)
+    const firstFive = slotValue(5, dim)
+    const secondTwo = slotValue(2, dim)
+    const secondFour = slotValue(4, dim)
+    const secondSix = slotValue(6, dim)
+    const firstTotal = multiplier * (firstThree + firstFive)
+    const secondTotal = multiplier * (secondTwo + secondFour + secondSix)
+    firstEquations.push(`${dimName}：主世界${multiplier}×（3号${firstThree}＋5号${firstFive}）＝${firstTotal}`)
+    secondEquations.push(`${dimName}：主世界${multiplier}×（2号${secondTwo}＋4号${secondFour}＋6号${secondSix}）＝${secondTotal}`)
+    firstScore += firstTotal
+    secondScore += secondTotal
   }
   firstScore = Math.max(0, Math.floor(firstScore))
   secondScore = Math.max(0, Math.floor(secondScore))
@@ -604,6 +834,12 @@ export function calculateScores(state, rng = null) {
     secondScore,
     userScore: state.firstPlayer === 'user' ? firstScore : secondScore,
     aiScore: state.firstPlayer === 'ai' ? firstScore : secondScore,
+    firstEquations,
+    secondEquations,
+    equationLines: [
+      `先手算式：${firstEquations.join('；')}`,
+      `后手算式：${secondEquations.join('；')}`,
+    ],
   }
 }
 
@@ -734,6 +970,16 @@ function applyGameEnd(state) {
   state.phase = 'roundEnd'
 }
 
+function applyVictorySignature(state, winner) {
+  if (winner === 'tie') return
+  const signature = activeSignature(state, winner)
+  const def = signature ? SIGNATURE_MAP[signature.id] : null
+  if (!def || def.trigger !== '取胜' || def.effect !== 'warVictory') return
+  const targets = shuffle(state.decks[winner], () => drawRandom(state)).slice(0, Math.min(4, state.decks[winner].length))
+  for (const card of targets) modifyStat(state, card, 'barren', 2, 'permanent')
+  addLog(state, `${winner === 'user' ? '你的' : '对手的'}「战争」令牌库中${targets.length}张卡牌荒芜永久＋2。`, 'effect')
+}
+
 export function completeRound(source, userRetainUid = null) {
   if (source.phase !== 'retain') return source
   const state = clone(source)
@@ -763,10 +1009,12 @@ export function completeRound(source, userRetainUid = null) {
     state.wins.ai += 1
   } else {
     state.wins[winner] += 1
+    applyVictorySignature(state, winner)
   }
   state.roundResult = { ...result, winner }
   state.pendingScoreBoard = null
   clearExpiredTemporaryStats(state)
+  for (const line of result.equationLines) addLog(state, line, 'score')
   addLog(state, `计分完成：你 ${result.userScore}／对手 ${result.aiScore}。`, 'important')
   applyGameEnd(state)
   return state
@@ -785,6 +1033,8 @@ export function beginNextRound(source) {
   state.revealQueue = []
   state.revealIndex = 0
   state.pendingScoreBoard = null
+  state.pilgrimageUsed = { user: false, ai: false }
+  applySignatureAura(state)
   drawToFive(state, 'user')
   drawToFive(state, 'ai')
   addLog(state, `第${state.round}回合开始，${state.firstPlayer === 'user' ? '你' : '对手'}先手。`, 'important')
@@ -809,8 +1059,6 @@ export function chooseAiCard(state) {
         return sum + state.dimensions.reduce((total, dim) => total + values[dim], 0)
       }, 0)
       bonus += dimScore * Math.min(2, handPotential / 20)
-      if (def.effect === 'emptySky') bonus += 8
-      if (def.effect === 'silentPact') bonus += 1
     } else {
       if (def.effect === 'mirror') {
         const previous = state.board[slot - 2]
@@ -825,7 +1073,7 @@ export function chooseAiCard(state) {
 
 export function phaseName(state) {
   return {
-    play: '出牌阶段', reveal: '拼点阶段', retain: '弃牌与保留', roundEnd: '结算完成', gameOver: '校订结束',
+    signature: '署名选择', play: '出牌阶段', reveal: '拼点阶段', retain: '弃牌与保留', roundEnd: '结算完成', gameOver: '校订结束',
   }[state.phase] || state.phase
 }
 

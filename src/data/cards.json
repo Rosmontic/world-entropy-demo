@@ -3,12 +3,12 @@
   "set": {
     "id": "WE-DEMO-01",
     "name": "第一次失名",
-    "version": "0.12.0",
+    "version": "0.13.0",
     "language": "zh-CN"
   },
   "cards": [
     {
-      "id": "A1.1",
+      "id": "A11.1",
       "name": "列鼎",
       "series": "A",
       "level": "纯净",
@@ -21,7 +21,7 @@
       "art": "whiteboard.svg"
     },
     {
-      "id": "A1.2",
+      "id": "A11.2",
       "name": "问鼎",
       "series": "A",
       "level": "萌芽",
@@ -34,7 +34,7 @@
       "art": "whiteboard.svg"
     },
     {
-      "id": "A1.3",
+      "id": "A11.3",
       "name": "逐鼎",
       "series": "A",
       "level": "灾祸",
@@ -47,7 +47,7 @@
       "art": "whiteboard.svg"
     },
     {
-      "id": "A1.4",
+      "id": "A11.4",
       "name": "裂鼎",
       "series": "A",
       "level": "崩坏",
@@ -60,7 +60,7 @@
       "art": "whiteboard.svg"
     },
     {
-      "id": "A1.5",
+      "id": "A11.5",
       "name": "空鼎",
       "series": "A",
       "level": "终末",
@@ -73,7 +73,7 @@
       "art": "whiteboard.svg"
     },
     {
-      "id": "A4",
+      "id": "A14",
       "name": "蚁穴",
       "series": "A",
       "level": "崩坏",
@@ -99,7 +99,7 @@
       "art": "a23-famine.svg"
     },
     {
-      "id": "B1.1",
+      "id": "B11.1",
       "name": "结绳",
       "series": "B",
       "level": "纯净",
@@ -112,7 +112,7 @@
       "art": "whiteboard.svg"
     },
     {
-      "id": "B1.2",
+      "id": "B11.2",
       "name": "立范",
       "series": "B",
       "level": "萌芽",
@@ -125,7 +125,7 @@
       "art": "whiteboard.svg"
     },
     {
-      "id": "B1.3",
+      "id": "B11.3",
       "name": "铸城",
       "series": "B",
       "level": "灾祸",
@@ -138,7 +138,7 @@
       "art": "whiteboard.svg"
     },
     {
-      "id": "B1.4",
+      "id": "B11.4",
       "name": "自铸",
       "series": "B",
       "level": "崩坏",
@@ -151,7 +151,7 @@
       "art": "whiteboard.svg"
     },
     {
-      "id": "B1.5",
+      "id": "B11.5",
       "name": "遗构",
       "series": "B",
       "level": "终末",
@@ -164,7 +164,7 @@
       "art": "whiteboard.svg"
     },
     {
-      "id": "B9",
+      "id": "B19",
       "name": "蜂巢",
       "series": "B",
       "level": "灾祸",
@@ -177,7 +177,7 @@
       "art": "b9-hive.svg"
     },
     {
-      "id": "C1.1",
+      "id": "C11.1",
       "name": "潮眠",
       "series": "C",
       "level": "纯净",
@@ -190,7 +190,7 @@
       "art": "whiteboard.svg"
     },
     {
-      "id": "C1.2",
+      "id": "C11.2",
       "name": "初汛",
       "series": "C",
       "level": "萌芽",
@@ -203,7 +203,7 @@
       "art": "whiteboard.svg"
     },
     {
-      "id": "C1.3",
+      "id": "C11.3",
       "name": "没野",
       "series": "C",
       "level": "灾祸",
@@ -216,7 +216,7 @@
       "art": "whiteboard.svg"
     },
     {
-      "id": "C1.4",
+      "id": "C11.4",
       "name": "陆沉",
       "series": "C",
       "level": "崩坏",
@@ -229,7 +229,7 @@
       "art": "whiteboard.svg"
     },
     {
-      "id": "C1.5",
+      "id": "C11.5",
       "name": "归墟",
       "series": "C",
       "level": "终末",
@@ -268,7 +268,7 @@
       "art": "c32-rain.svg"
     },
     {
-      "id": "Y2",
+      "id": "Y12",
       "name": "镜子",
       "series": "Y",
       "level": "隐秘",
@@ -307,20 +307,7 @@
       "art": "y96-faces.svg"
     },
     {
-      "id": "C1",
-      "name": "空天",
-      "series": "C",
-      "level": "终末",
-      "stats": { "chaos": "-", "barren": "-", "disqualification": "-", "calamity": "-" },
-      "keywords": ["中枢"],
-      "trigger": "主导",
-      "effect": "emptySky",
-      "text": "［主导］所有维度均纳入计数；此牌属性无法被改变。计分时，此牌的“－”视为2，而非0。",
-      "flavor": "天幕是真实的，也此外未遗一物。",
-      "art": "c1-empty-sky.svg"
-    },
-    {
-      "id": "O1",
+      "id": "O11",
       "name": "无名原野",
       "series": "O",
       "level": "纯净",
@@ -333,7 +320,7 @@
       "art": "o1-field.svg"
     },
     {
-      "id": "O2",
+      "id": "O12",
       "name": "观测灯塔",
       "series": "O",
       "level": "纯净",
@@ -344,19 +331,6 @@
       "text": "［显现］翻开相邻后位的暗牌，并触发其［显现］；若没有合法目标，则不处理。",
       "flavor": "灯不是为了照见海岸，而是为了证明海岸仍在那里。",
       "art": "o2-lighthouse.svg"
-    },
-    {
-      "id": "O3",
-      "name": "静默公约",
-      "series": "O",
-      "level": "纯净",
-      "stats": { "chaos": 1, "barren": 1, "disqualification": 1, "calamity": 1 },
-      "keywords": ["中枢"],
-      "trigger": "主导",
-      "effect": "silentPact",
-      "text": "［主导］此牌属性无法增加。",
-      "flavor": "所有人同意不再追问，于是世界暂时同意继续存在。",
-      "art": "o3-pact.svg"
     },
     {
       "id": "O1000",

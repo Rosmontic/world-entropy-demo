@@ -110,7 +110,7 @@ describe('出牌、跳过与停止', () => {
     expect(canPlay(makeCard('A14'), 3, 4)).toBe(true)
     expect(canPlay(makeCard('A11.5'), 1, 6)).toBe(false)
     expect(canPlay(makeCard('A11.5'), 1, 7)).toBe(true)
-    expect(canPlay(makeCard('O11', { keywords: ['中枢'] }), 3, 7)).toBe(false)
+    expect(canPlay(makeCard('O1000'), 3, 7)).toBe(false)
     expect(canPlay(makeCard('Y96'), 1, 1)).toBe(false)
     expect(canPlay(makeCard('Y96'), 6, 4)).toBe(true)
   })
@@ -209,10 +209,10 @@ describe('四维、修正与结算随机', () => {
       faceUp: true,
       stats: { chaos: '?', barren: 0, disqualification: 0, calamity: 0 },
       tempStats: { chaos: -100 },
-      auraStats: { chaos: 2 },
     })
+    game.mounts.user = { id: 'C5', owner: 'user', chargesRemaining: null, faceUp: true }
     game.board[2] = makeCard('O11', { faceUp: true, stats: { chaos: 3, barren: 0, disqualification: 0, calamity: 0 } })
-    expect(calculateScores(game, () => 0).firstScore).toBe(9)
+    expect(calculateScores(game, () => 0).firstScore).toBe(6)
   })
 })
 

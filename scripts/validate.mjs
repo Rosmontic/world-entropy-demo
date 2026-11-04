@@ -65,7 +65,7 @@ try {
   await page.getByRole('button', { name: '关闭' }).click()
 
   await page.getByRole('button', { name: '开始校订' }).click()
-  await page.getByRole('heading', { name: '选择卡组' }).waitFor()
+  await page.getByRole('heading', { name: '选择卡组与署名' }).waitFor()
   await page.getByRole('textbox', { name: '随机种子' }).fill(humanFirstSeed)
   if (!await page.getByRole('button', { name: /复制 seed/ }).isVisible()) throw new Error('缺少复制 seed 控件')
   if (!await page.getByRole('button', { name: '随机 seed' }).isVisible()) throw new Error('缺少随机 seed 控件')
@@ -76,22 +76,28 @@ try {
   if (!(await customStart.isDisabled())) throw new Error('空卡组不应允许开始')
   await page.getByRole('button', { name: '按当前倾向随机填充' }).click()
   if (await customStart.isDisabled()) throw new Error('合法自建卡组应允许开始')
-  if (await page.locator('.builder-row').count() !== 27) throw new Error('构筑池应包含 27 张可用卡')
+  if (await page.locator('.builder-row').count() !== 25) throw new Error('构筑池应包含 25 张可用卡')
   await customStart.click()
+  await page.getByRole('heading', { name: '选择你的署名' }).waitFor()
+  await page.getByRole('button', { name: '秘密确认' }).click()
+  await page.getByRole('button', { name: '同时公开署名' }).click()
   await page.locator('.hand-row .game-card').first().waitFor()
   if (await page.locator('.hand-row .game-card').count() !== 5) throw new Error('自建卡组开局手牌不是 5 张')
 
   await page.getByRole('button', { name: '返回标题' }).click()
   await page.getByRole('button', { name: '开始校订' }).click()
-  await page.getByRole('heading', { name: '选择卡组' }).waitFor()
+  await page.getByRole('heading', { name: '选择卡组与署名' }).waitFor()
   await page.getByRole('textbox', { name: '随机种子' }).fill(humanFirstSeed)
   await page.getByRole('button', { name: '系统随机构筑' }).click()
   await page.getByRole('button', { name: '确认并开始' }).click()
+  await page.getByRole('heading', { name: '选择你的署名' }).waitFor()
+  await page.getByRole('button', { name: '秘密确认' }).click()
+  await page.getByRole('button', { name: '同时公开署名' }).click()
   await page.locator('.seed-current code').filter({ hasText: humanFirstSeed }).waitFor()
 
   await page.getByRole('button', { name: /卡牌库/ }).click()
   const libraryCards = await page.locator('.library-grid .game-card').count()
-  if (libraryCards !== 28) throw new Error(`卡牌库应为 28 张，实际 ${libraryCards}`)
+  if (libraryCards !== 26) throw new Error(`卡牌库应为 26 张，实际 ${libraryCards}`)
   await page.getByRole('textbox', { name: '搜索卡牌' }).fill('镜子')
   if (await page.locator('.library-grid .game-card').count() !== 1) throw new Error('卡牌搜索未正确过滤')
   await page.getByRole('button', { name: '关闭' }).click()
@@ -123,6 +129,9 @@ try {
   await page.getByText('第 2 回合', { exact: true }).waitFor()
 
   await page.getByRole('button', { name: '重新开始' }).click()
+  await page.getByRole('heading', { name: '选择你的署名' }).waitFor()
+  await page.getByRole('button', { name: '秘密确认' }).click()
+  await page.getByRole('button', { name: '同时公开署名' }).click()
   const restartStop = page.getByRole('button', { name: /停止出牌/ })
   if (!(await restartStop.isDisabled())) await restartStop.click()
   await page.locator('.main-slot .card-id').filter({ hasText: 'O1000' }).waitFor()
@@ -144,7 +153,7 @@ try {
 
   const report = {
     ok: true,
-    checks: ['标题页', 'seed 控件', '自行构筑卡组', '随机构筑开局', '28 张卡牌库', '卡牌搜索', '规则弹窗', '5 张开局手牌', '6 个战场位置', '牌库查看', '弃牌区查看', '点击出牌', '系统备用主世界', 'AI 自动出牌', '逐张显现', '保留先于结算', '进入下一回合', '图片加载', '手机布局'],
+    checks: ['标题页', 'seed 控件', '署名携带', '自行构筑卡组', '随机构筑开局', '开局署名流程', '26 张卡牌库', '卡牌搜索', '规则弹窗', '5 张开局手牌', '6 个战场位置', '挂载区展示', '牌库查看', '弃牌区查看', '点击出牌', '系统备用主世界', 'AI 自动出牌', '逐张显现', '完整计分算式', '保留先于结算', '进入下一回合', '图片加载', '手机布局'],
     screenshots: ['artifacts/title.png', 'artifacts/gameplay.png', 'artifacts/system-main.png', 'artifacts/mobile.png'],
     consoleErrors: errors,
   }

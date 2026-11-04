@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "0.13.0",
+  "language": "zh-CN",
+  "signatures": [
+    {
+      "id": "0",
+      "name": "序言",
+      "series": "SYSTEM",
+      "trigger": null,
+      "effect": null,
+      "charges": null,
+      "text": "无效果。",
+      "flavor": "你没有选择署名，但此处并非空无一物。"
+    },
+    {
+      "id": "O1",
+      "name": "现世",
+      "series": "O",
+      "trigger": "挂载",
+      "effect": "presentWorld",
+      "charges": null,
+      "text": "[挂载] 双方玩家牌库中纯净级和萌芽级的卡牌四维永久+1。",
+      "flavor": "在此"
+    },
+    {
+      "id": "A1",
+      "name": "战争",
+      "series": "A",
+      "trigger": "取胜",
+      "effect": "warVictory",
+      "charges": null,
+      "text": "[取胜] 随机使你的牌库中至多4张卡牌荒芜永久+2。",
+      "flavor": "兵戈扰攘"
+    },
+    {
+      "id": "B3",
+      "name": "寰宇",
+      "series": "B",
+      "trigger": "巡礼",
+      "effect": "cosmicPilgrimage",
+      "charges": 3,
+      "text": "[巡礼3] 选择1项：①抽取1张具有[保留]的牌，②选择触发1张具有[保留]的手牌的1次保留效果。",
+      "flavor": "普天之下"
+    },
+    {
+      "id": "C5",
+      "name": "洚水",
+      "series": "C",
+      "trigger": "界域",
+      "effect": "floodAura",
+      "charges": null,
+      "text": "[界域] 双方卡牌失格+1，混沌+1。",
+      "flavor": "沧海横流"
+    }
+  ]
+}

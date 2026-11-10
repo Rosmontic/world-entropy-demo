@@ -4,12 +4,15 @@ import CardView from './components/CardView'
 import {
   CARD_LIST, CARD_COPY_LIMIT, DECK_MAX_SIZE, DIMENSIONS, LEVEL_DECK_LIMITS,
   MAX_ROUNDS, PLAYABLE_CARD_LIST, SERIES_OPTIONS, SIGNATURE_LIST, SIGNATURE_MAP,
-  buildRandomDeckRecipe, canPlay, chooseAiCard, completeRound, confirmSignatures,
+  buildRandomDeckRecipe, canPlay, completeRound, confirmSignatures,
   createGame, currentSlot, definition, placeCard, randomSeed, revealStep,
   seededRandom, selectSignature, selectSlot, shuffle, signatureLabel, signatureText,
   skipSlot, slotsFor, sortCardsForDisplay, beginNextRound, phaseName, stopTurn,
   useAiPilgrimage, usePilgrimage, validateDeckRecipe, validateSignatureLoadout,
 } from './game/engine'
+import {
+  AIConfig, AI_DIFFICULTIES, chooseAction, createAIRng, step as applyAiAssignments,
+} from './game/ai'
 
 const PHASES = ['署名', '抽牌', '维度', '出牌', '拼点', '弃牌与保留', '结算']
 const LEVELS = ['全部', '纯净', '萌芽', '灾祸', '崩坏', '终末', '隐秘']
@@ -62,6 +65,9 @@ function App() {
   const [logOpen, setLogOpen] = useState(false)
   const [deckMode, setDeckMode] = useState('random')
   const [seriesTendency, setSeriesTendency] = useState('均衡')
+  const [aiDifficulty, setAiDifficulty] = useState('regular')
+  const [activeAiDifficulty, setActiveAiDifficulty] = useState('regular')
+  const [aiKeepUid, setAiKeepUid] = useState(null)
   const [builderCounts, setBuilderCounts] = useState(() => countsFromRecipe(buildRandomDeckRecipe()))
   const [signatureLoadout, setSignatureLoadout] = useState([])
   const [activeDeckConfig, setActiveDeckConfig] = useState({ userRecipe: null, aiRecipe: null })
@@ -97,15 +103,23 @@ function App() {
   useEffect(() => {
     if (!started || game.phase !== 'play' || game.turn.player !== 'ai') return undefined
     const timer = window.setTimeout(() => {
-      setGame((previous) => {
-        const pilgrimaged = useAiPilgrimage(previous)
-        if (pilgrimaged !== previous) return pilgrimaged
-        const uid = chooseAiCard(previous)
-        return uid ? placeCard(previous, uid) : stopTurn(previous)
-      })
+      const pilgrimaged = useAiPilgrimage(game)
+      if (pilgrimaged !== game) {
+        setGame(pilgrimaged)
+        return
+      }
+      const action = chooseAction(
+        game,
+        'ai',
+        activeAiDifficulty,
+        AIConfig,
+        createAIRng(`${game.seed}:ai:${game.round}:${activeAiDifficulty}`),
+      )
+      setAiKeepUid(action.keepPlan?.uid || null)
+      setGame((previous) => applyAiAssignments(previous, { actor: 'ai', assignments: action.assignments }))
     }, 720)
     return () => window.clearTimeout(timer)
-  }, [started, game])
+  }, [started, game, activeAiDifficulty])
 
   useEffect(() => {
     if (!started || game.phase !== 'reveal') return undefined
@@ -125,6 +139,8 @@ function App() {
     setSignatureConfirmed(false)
     setSelectedSignature(null)
     setPilgrimageModal(false)
+    setActiveAiDifficulty(aiDifficulty)
+    setAiKeepUid(null)
     setGame(createGame({ ...activeDeckConfig, ...activeSignatureConfig, seed: nextSeed, signaturePhase: true }))
     setSelected(null)
     setRetainUid(null)
@@ -219,6 +235,8 @@ function App() {
     setSignatureConfirmed(false)
     setSelectedSignature(signatureLoadout[0] || null)
     setPilgrimageModal(false)
+    setActiveAiDifficulty(aiDifficulty)
+    setAiKeepUid(null)
     setGame(createGame({ ...recipes, ...signatureConfig, seed: chosenSeed, signaturePhase: true }))
     setSelected(null)
     setRetainUid(null)
@@ -431,6 +449,14 @@ function App() {
             <p>署名独立于卡组，最多3张且不可重复；未选择时自动挂载「0-序言」。 {!signatureValidation.valid && <b>{signatureValidation.errors.join('；')}</b>}</p>
           </div>
 
+          <div className="setup-modes difficulty-modes" aria-label="AI 难度">
+            {AI_DIFFICULTIES.map((difficulty) => (
+              <button key={difficulty} className={aiDifficulty === difficulty ? 'active' : ''} onClick={() => setAiDifficulty(difficulty)}>
+                {difficulty === 'beginner' ? '入门阶 AI' : difficulty === 'regular' ? '常规阶 AI' : '困难阶 AI'}
+              </button>
+            ))}
+          </div>
+
           <div className="setup-modes">
             <button className={deckMode === 'random' ? 'active' : ''} onClick={() => setDeckMode('random')}>系统随机构筑</button>
             <button className={deckMode === 'custom' ? 'active' : ''} onClick={() => setDeckMode('custom')}>自行构筑卡组</button>
@@ -568,7 +594,7 @@ function App() {
             {game.hands.user.map((card) => <CardView key={card.uid} card={card} selected={retainUid === card.uid} onClick={() => setRetainUid(retainUid === card.uid ? null : card.uid)} />)}
             {!game.hands.user.length && <p>没有可保留的手牌。</p>}
           </div>
-          <button className="primary-button full-button" onClick={() => { setGame((previous) => completeRound(previous, retainUid)); setRetainUid(null) }}>完成保留并结算</button>
+          <button className="primary-button full-button" onClick={() => { setGame((previous) => completeRound(previous, retainUid, aiKeepUid)); setRetainUid(null); setAiKeepUid(null) }}>完成保留并结算</button>
         </Modal>
       )}
 
@@ -580,7 +606,7 @@ function App() {
             <span>完整计分算式</span>
             {game.roundResult.equationLines.map((line) => <code key={line}>{line}</code>)}
           </div>
-          <button className="primary-button full-button" onClick={() => setGame((previous) => beginNextRound(previous))}>进入下一回合</button>
+          <button className="primary-button full-button" onClick={() => { setAiKeepUid(null); setGame((previous) => beginNextRound(previous)) }}>进入下一回合</button>
         </Modal>
       )}
 

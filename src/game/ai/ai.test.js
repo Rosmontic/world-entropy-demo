@@ -10,6 +10,7 @@ import {
   LegalActions,
   RegularPolicy,
   RulesEngine,
+  calculateHardX,
   chooseAction,
   chooseHardAction,
   compareResourceCost,
@@ -367,11 +368,11 @@ describe('AI-07：真人响应期望 x', () => {
     expect(() => expectedValueOverHumanResponses(state, { 1: aiCard.uid }, badModel, { actor: 'ai' })).toThrow(/normalized/)
   })
 
-  it('07-3/07-4 后手不猜响应且无困难自对弈入口', () => {
+  it('07-3/07-4 后手完整结算且不猜响应，无困难自对弈入口', () => {
     const text = sourceText('./hard.js')
-    const secondBranch = text.slice(text.indexOf('const next = step(state'))
+    const secondBranch = text.slice(text.indexOf('const next = settleRound(state'))
     expect(secondBranch).not.toContain('expectedValueOverHumanResponses')
-    expect(secondBranch).toContain('step(state, { actor, assignments: assignment })')
+    expect(secondBranch).toContain('settleRound(state, { [actor]: assignment })')
     const allText = AI_FILES.map(sourceText).join('\n')
     expect(allText).not.toContain('runBatch')
     expect(allText).not.toContain('HardPolicy vs HardPolicy')
@@ -512,10 +513,10 @@ describe('AI-11：词条与效果统一入口', () => {
     }
   })
 
-  it('11-4 困难阶估值调用 step', () => {
+  it('11-4 困难阶估值完成整回合结算', () => {
     const text = sourceText('./hard.js')
-    expect(text).toContain('step(state, { actor, assignments: assignment })')
-    expect(text).toContain('step(afterAI')
+    expect(text).toContain('settleRound(state, { [actor]: assignment })')
+    expect(text).toContain('settleRound(afterAI')
   })
 })
 
@@ -526,5 +527,62 @@ describe('AI-12：最终轻量检查', () => {
     expect(LegalActions).toHaveProperty('enumerateAssignments')
     expect(RulesEngine).toHaveProperty('step')
     expect(getAcceptFloor('ai', 3, AIConfig, 'ai')).toBe(AIConfig.hard.FIRST_ACCEPT[0])
+  })
+})
+
+describe('AI-13：困难阶不出牌回归', () => {
+  it('13-1 后手出牌与全空必须产生不同的结算估值', () => {
+    const main = makeCard('O11', {
+      owner: 'user',
+      uid: 'regression-main',
+      faceUp: false,
+      stats: { chaos: 2, barren: 0, disqualification: 0, calamity: 0 },
+    })
+    const card = makeCard('O11', {
+      owner: 'ai',
+      uid: 'regression-play',
+      stats: { chaos: 5, barren: 0, disqualification: 0, calamity: 0 },
+    })
+    const state = minimalState({
+      actor: 'ai',
+      firstPlayer: 'user',
+      hand: [card],
+      board: [main, null, null, null, null, null],
+    })
+    const emptyX = calculateHardX(state, 'ai', {})
+    const playedX = calculateHardX(state, 'ai', { 2: card.uid })
+    expect(playedX).toBeGreaterThan(emptyX)
+  })
+
+  it('13-2 消极分支先取较高 x，不让全空凭低成本胜出', () => {
+    const state = minimalState({ actor: 'ai', firstPlayer: 'user', round: 3 })
+    const candidates = [{}, { 2: 'low-card' }]
+    const chosen = chooseHardAction(candidates, [0.1, 0.4], state, {
+      actor: 'ai',
+      acceptFloor: 0.5,
+    })
+    expect(chosen.passive).toBe(true)
+    expect(chosen.assignment).toEqual({ 2: 'low-card' })
+    expect(chosen.x).toBe(0.4)
+  })
+
+  it('13-3 平坦估值回退常规阶并实际出牌', () => {
+    const card = makeCard('O11', {
+      owner: 'ai',
+      uid: 'flat-play',
+      stats: { chaos: 5, barren: 0, disqualification: 0, calamity: 0 },
+    })
+    const main = makeCard('O11', { owner: 'user', uid: 'flat-main' })
+    const state = minimalState({
+      actor: 'ai',
+      firstPlayer: 'user',
+      hand: [card],
+      board: [main, null, null, null, null, null],
+    })
+    const result = HardPolicy(state, 'ai', AIConfig, createAIRng('flat-evaluation'), {
+      context: { actor: 'ai', evaluator: () => 0.5 },
+    })
+    expect(result.debug.flatEvaluation).toBe(true)
+    expect(Object.keys(result.assignments).length).toBeGreaterThan(0)
   })
 })

@@ -10,7 +10,7 @@ import { AIConfig, AI_LEVEL_ORDER, AI_TIMEOUT, stageIndex } from './config'
 import { chooseKeepByPriority } from './keep'
 import { enumerateAssignments } from './legal'
 import { RegularPolicy } from './regular'
-import { cloneState, step } from './sandbox'
+import { cloneState, settleRound, step } from './sandbox'
 
 function clamp01(value, label = 'V') {
   if (typeof value !== 'number' || Number.isNaN(value)) {
@@ -106,9 +106,12 @@ export function expectedValueOverHumanResponses(state, assignment, humanModel, o
   }
   let value = 0
   for (const response of responses) {
-    const responseValue = typeof response.value === 'number'
-      ? response.value
-      : evaluateState(step(afterAI, { actor: OTHER_PLAYER[actor], assignments: response.assignment }), options.context || {})
+    let responseValue = response.value
+    if (typeof responseValue !== 'number') {
+      // 必须完成揭示、计分、胜点和下一回合推进，否则所有分配只看到同一个中间状态。
+      const afterResponse = settleRound(afterAI, { [OTHER_PLAYER[actor]]: response.assignment })
+      responseValue = evaluateState(afterResponse, { ...(options.context || {}), actor })
+    }
     value += response.probability * clamp01(responseValue, 'V')
   }
   return clamp01(value, 'x')
@@ -121,8 +124,8 @@ export function calculateHardX(state, actor, assignment, options = {}) {
       actor,
     })
   }
-  const next = step(state, { actor, assignments: assignment })
-  return clamp01(evaluateState(next, options.context || { actor }), 'x')
+  const next = settleRound(state, { [actor]: assignment })
+  return clamp01(evaluateState(next, { ...(options.context || {}), actor }), 'x')
 }
 
 export function getAcceptFloor(actor, round, config = AIConfig, firstPlayer = null) {
@@ -180,13 +183,8 @@ export function chooseHardAction(candidates, xValues, state, options = {}) {
   const xMax = Math.max(...xs)
 
   if (xMax < acceptFloor) {
-    const sorted = [...indexed].sort((a, b) => compareResourceCost(a.assignment, b.assignment, state))
-    const minimumCost = resourceCost(sorted[0].assignment, state)
-    const lowCost = sorted.filter((item) => {
-      const cost = resourceCost(item.assignment, state)
-      return cost.levelSum === minimumCost.levelSum && cost.statSum === minimumCost.statSum && cost.placed === minimumCost.placed
-    })
-    const chosen = lowCost.sort((a, b) => b.x - a.x || compareResourceCost(a.assignment, b.assignment, state))[0]
+    // 先避免更低的整局胜率，再在价值相同的时候节省资源；全空不再凭成本为0直接胜出。
+    const chosen = [...indexed].sort((a, b) => b.x - a.x || compareResourceCost(a.assignment, b.assignment, state))[0]
     return { ...chosen, passive: true, acceptFloor, xMax }
   }
 
@@ -200,16 +198,19 @@ export function chooseHardAction(candidates, xValues, state, options = {}) {
   return { ...chosen, passive: false, acceptFloor, xMax }
 }
 
-function fallbackToRegular(state, actor, config, aiRng, timeout, elapsedMs, candidateCount) {
+function fallbackToRegular(state, actor, config, aiRng, details) {
   const fallback = RegularPolicy(state, actor, config, aiRng)
   return {
     ...fallback,
     debug: {
       ...fallback.debug,
       difficulty: 'hard',
-      timeout,
-      elapsedMs,
-      candidateCount,
+      timeout: details.timeout,
+      elapsedMs: details.elapsedMs,
+      candidateCount: details.candidateCount,
+      evaluatedCount: details.evaluatedCount,
+      truncatedByTime: details.truncatedByTime,
+      flatEvaluation: details.flatEvaluation,
     },
   }
 }
@@ -247,8 +248,22 @@ export function HardPolicy(state, actor, config = AIConfig, aiRng = createDeterm
   }
 
   const elapsedMs = now() - started
-  if (!evaluated.length) {
-    return fallbackToRegular(state, actor, config, aiRng, true, elapsedMs, candidates.length)
+  const fallbackDetails = {
+    timeout,
+    elapsedMs,
+    candidateCount: candidates.length,
+    evaluatedCount: evaluated.length,
+    truncatedByTime: timeout,
+    flatEvaluation: false,
+  }
+  // 候选未完整评估时不从“全空＋前几个单牌”中凑答案，直接采用常规阶。
+  if (timeout || !evaluated.length) {
+    return fallbackToRegular(state, actor, config, aiRng, { ...fallbackDetails, timeout: true, truncatedByTime: true })
+  }
+
+  const flatEvaluation = evaluated.length > 1 && evaluated.every((item) => item.x === evaluated[0].x)
+  if (flatEvaluation) {
+    return fallbackToRegular(state, actor, config, aiRng, { ...fallbackDetails, flatEvaluation: true })
   }
 
   const chosen = chooseHardAction(
@@ -269,6 +284,9 @@ export function HardPolicy(state, actor, config = AIConfig, aiRng = createDeterm
       round: state.round,
       actor,
       candidateCount: candidates.length,
+      evaluatedCount: evaluated.length,
+      truncatedByTime: false,
+      flatEvaluation: false,
       y: null,
       floor: null,
       xMax: chosen.xMax,

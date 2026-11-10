@@ -985,7 +985,7 @@ function applyVictorySignature(state, winner) {
   addLog(state, `${winner === 'user' ? '你的' : '对手的'}「战争」令牌库中${targets.length}张卡牌荒芜永久＋2。`, 'effect')
 }
 
-export function completeRound(source, userRetainUid = null) {
+export function completeRound(source, userRetainUid = null, aiRetainUid = null) {
   if (source.phase !== 'retain') return source
   const state = clone(source)
   state.pendingScoreBoard ||= clone(state.board)
@@ -999,7 +999,7 @@ export function completeRound(source, userRetainUid = null) {
   const players = [state.firstPlayer, OTHER_PLAYER[state.firstPlayer]]
   const retainDecisions = {
     user: userRetainUid,
-    ai: chooseAiRetain(state),
+    ai: aiRetainUid || chooseAiRetain(state),
   }
   for (const player of players) {
     retainCard(state, player, retainDecisions[player])
@@ -1080,6 +1080,14 @@ export function phaseName(state) {
   return {
     signature: '署名选择', play: '出牌阶段', reveal: '拼点阶段', retain: '弃牌与保留', roundEnd: '结算完成', gameOver: '校订结束',
   }[state.phase] || state.phase
+}
+
+export function isTerminal(state) {
+  return state.phase === 'gameOver'
+}
+
+export function getWinner(state) {
+  return isTerminal(state) ? state.gameWinner : null
 }
 
 export function sortCardsForDisplay(cards) {
